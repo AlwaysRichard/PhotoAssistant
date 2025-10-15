@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="512" cy="512" r="512" fill="#4A90E2"/>
+  
+  <!-- Main photographer figure -->
+  <g transform="translate(256, 200) scale(1.5)">
+    <!-- Head -->
+    <circle cx="170" cy="120" r="60" fill="#FDBCB4" stroke="#2C3E50" stroke-width="4"/>
+    
+    <!-- Hat -->
+    <ellipse cx="170" cy="90" rx="45" ry="25" fill="#A8D5E2" stroke="#2C3E50" stroke-width="4"/>
+    <ellipse cx="170" cy="80" rx="65" ry="15" fill="#A8D5E2" stroke="#2C3E50" stroke-width="4"/>
+    
+    <!-- Eyes -->
+    <circle cx="155" cy="115" r="6" fill="#2C3E50"/>
+    <circle cx="185" cy="115" r="6" fill="#2C3E50"/>
+    
+    <!-- Nose -->
+    <circle cx="170" cy="125" r="2" fill="#2C3E50"/>
+    
+    <!-- Mouth -->
+    <path d="M 160 135 Q 170 145 180 135" stroke="#2C3E50" stroke-width="3" fill="none" stroke-linecap="round"/>
+    
+    <!-- Body -->
+    <rect x="130" y="180" width="80" height="100" rx="10" fill="#FFFFFF" stroke="#2C3E50" stroke-width="4"/>
+    
+    <!-- Collar -->
+    <polygon points="145,180 195,180 185,200 155,200" fill="#FFFFFF" stroke="#2C3E50" stroke-width="4"/>
+    
+    <!-- Buttons -->
+    <circle cx="170" cy="200" r="4" fill="#2C3E50"/>
+    <circle cx="170" cy="220" r="4" fill="#2C3E50"/>
+    <circle cx="170" cy="240" r="4" fill="#2C3E50"/>
+    
+    <!-- Arms -->
+    <rect x="210" y="190" width="15" height="60" rx="7" fill="#FDBCB4" stroke="#2C3E50" stroke-width="4"/>
+    <rect x="115" y="190" width="15" height="60" rx="7" fill="#FDBCB4" stroke="#2C3E50" stroke-width="4"/>
+    
+    <!-- Camera -->
+    <g transform="translate(90, 210)">
+      <!-- Camera body -->
+      <rect x="0" y="0" width="50" height="35" rx="5" fill="#34495E" stroke="#2C3E50" stroke-width="3"/>
+      <!-- Lens -->
+      <circle cx="25" cy="17" r="15" fill="#F39C12" stroke="#2C3E50" stroke-width="3"/>
+      <circle cx="25" cy="17" r="8" fill="#FFFFFF" stroke="#2C3E50" stroke-width="2"/>
+      <!-- Viewfinder -->
+      <rect x="35" y="-5" width="10" height="8" rx="2" fill="#34495E" stroke="#2C3E50" stroke-width="2"/>
+      <!-- Flash -->
+      <rect x="5" y="-3" width="8" height="6" rx="1" fill="#ECF0F1" stroke="#2C3E50" stroke-width="1"/>
+    </g>
+    
+    <!-- Strap -->
+    <path d="M 140 210 Q 90 190 90 230" stroke="#8B4513" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
