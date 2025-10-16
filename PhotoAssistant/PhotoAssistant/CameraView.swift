@@ -45,6 +45,7 @@ struct CameraView: View {
     @State private var showingLocationPermissionAlert = false
     @State private var showingInitialLocationRequest = false
     @State private var cameraStarted = false
+    var onBack: (() -> Void)? = nil
     
     var body: some View {
         GeometryReader { geometry in
@@ -56,6 +57,32 @@ struct CameraView: View {
                 // Camera preview with dynamic sizing based on orientation
                 CameraPreviewView(cameraManager: cameraManager, size: geometry.size)
                     .ignoresSafeArea()
+                
+                // Back button in upper left corner
+                VStack {
+                    HStack {
+                        if let onBack = onBack {
+                            Button(action: onBack) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 16, weight: .medium))
+                                    Text("Home")
+                                        .font(.system(size: 16, weight: .medium))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.5))
+                                .cornerRadius(20)
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, geometry.safeAreaInsets.top + 60)
+                    .padding(.horizontal, 20)
+                    
+                    Spacer()
+                }
                 
                 VStack {
                     Spacer()
