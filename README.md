@@ -1,4 +1,5 @@
 # PhotoAssistant
+<<<<<<< HEAD
 
 A professional iOS camera app that captures photos with comprehensive location, orientation, and metadata information. Perfect for photography professionals, surveyors, real estate agents, and anyone who needs detailed spatial data embedded in their photos.
 
@@ -115,3 +116,6 @@ Created by Richard Cox - October 2025
 ---
 
 *PhotoAssistant - Capture more than just images, capture the complete picture.*
+=======
+Help photographers plan photos
+>>>>>>> 149d4d15dc92055bfe0dfc32f19bc1ba194eb98d
