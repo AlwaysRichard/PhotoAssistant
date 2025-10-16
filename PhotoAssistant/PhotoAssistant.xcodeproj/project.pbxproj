@@ -1,585 +1,589 @@
 // !$*UTF8*$!
 {
-    archiveVersion = 1;
-    classes = {
-    };
-    objectVersion = 77;
-    objects = {
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
 
 /* Begin PBXContainerItemProxy section */
-        85FA1CD22E9DF6AA00A6BB61 /* PBXContainerItemProxy */ = {
-            isa = PBXContainerItemProxy;
-            containerPortal = 85FA1CBA2E9DF6A800A6BB61 /* Project object */;
-            proxyType = 1;
-            remoteGlobalIDString = 85FA1CC12E9DF6A900A6BB61;
-            remoteInfo = PhotoAssistant;
-        };
-        85FA1CDC2E9DF6AA00A6BB61 /* PBXContainerItemProxy */ = {
-            isa = PBXContainerItemProxy;
-            containerPortal = 85FA1CBA2E9DF6A800A6BB61 /* Project object */;
-            proxyType = 1;
-            remoteGlobalIDString = 85FA1CC12E9DF6A900A6BB61;
-            remoteInfo = PhotoAssistant;
-        };
+		85FA1CD22E9DF6AA00A6BB61 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 85FA1CBA2E9DF6A800A6BB61 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 85FA1CC12E9DF6A900A6BB61;
+			remoteInfo = PhotoAssistant;
+		};
+		85FA1CDC2E9DF6AA00A6BB61 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 85FA1CBA2E9DF6A800A6BB61 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 85FA1CC12E9DF6A900A6BB61;
+			remoteInfo = PhotoAssistant;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-        85FA1CC22E9DF6A900A6BB61 /* PhotoAssistant.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhotoAssistant.app; sourceTree = BUILT_PRODUCTS_DIR; };
-        85FA1CD12E9DF6AA00A6BB61 /* PhotoAssistantTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoAssistantTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-        85FA1CDB2E9DF6AA00A6BB61 /* PhotoAssistantUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoAssistantUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		85FA1CC22E9DF6A900A6BB61 /* PhotoAssistant.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhotoAssistant.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		85FA1CD12E9DF6AA00A6BB61 /* PhotoAssistantTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoAssistantTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		85FA1CDB2E9DF6AA00A6BB61 /* PhotoAssistantUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoAssistantUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-        85FA1CC42E9DF6A900A6BB61 /* PhotoAssistant */ = {
-            isa = PBXFileSystemSynchronizedRootGroup;
-            path = PhotoAssistant;
-            sourceTree = "<group>";
-        };
-        85FA1CD42E9DF6AA00A6BB61 /* PhotoAssistantTests */ = {
-            isa = PBXFileSystemSynchronizedRootGroup;
-            path = PhotoAssistantTests;
-            sourceTree = "<group>";
-        };
-        85FA1CDE2E9DF6AA00A6BB61 /* PhotoAssistantUITests */ = {
-            isa = PBXFileSystemSynchronizedRootGroup;
-            path = PhotoAssistantUITests;
-            sourceTree = "<group>";
-        };
+		85FA1CC42E9DF6A900A6BB61 /* PhotoAssistant */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PhotoAssistant;
+			sourceTree = "<group>";
+		};
+		85FA1CD42E9DF6AA00A6BB61 /* PhotoAssistantTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PhotoAssistantTests;
+			sourceTree = "<group>";
+		};
+		85FA1CDE2E9DF6AA00A6BB61 /* PhotoAssistantUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PhotoAssistantUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-        85FA1CBF2E9DF6A900A6BB61 /* Frameworks */ = {
-            isa = PBXFrameworksBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
-        85FA1CCE2E9DF6AA00A6BB61 /* Frameworks */ = {
-            isa = PBXFrameworksBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
-        85FA1CD82E9DF6AA00A6BB61 /* Frameworks */ = {
-            isa = PBXFrameworksBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
+		85FA1CBF2E9DF6A900A6BB61 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85FA1CCE2E9DF6AA00A6BB61 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85FA1CD82E9DF6AA00A6BB61 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-        85FA1CB92E9DF6A800A6BB61 = {
-            isa = PBXGroup;
-            children = (
-                85FA1CC42E9DF6A900A6BB61 /* PhotoAssistant */,
-                85FA1CD42E9DF6AA00A6BB61 /* PhotoAssistantTests */,
-                85FA1CDE2E9DF6AA00A6BB61 /* PhotoAssistantUITests */,
-                85FA1CC32E9DF6A900A6BB61 /* Products */,
-            );
-            sourceTree = "<group>";
-        };
-        85FA1CC32E9DF6A900A6BB61 /* Products */ = {
-            isa = PBXGroup;
-            children = (
-                85FA1CC22E9DF6A900A6BB61 /* PhotoAssistant.app */,
-                85FA1CD12E9DF6AA00A6BB61 /* PhotoAssistantTests.xctest */,
-                85FA1CDB2E9DF6AA00A6BB61 /* PhotoAssistantUITests.xctest */,
-            );
-            name = Products;
-            sourceTree = "<group>";
-        };
+		85FA1CB92E9DF6A800A6BB61 = {
+			isa = PBXGroup;
+			children = (
+				85FA1CC42E9DF6A900A6BB61 /* PhotoAssistant */,
+				85FA1CD42E9DF6AA00A6BB61 /* PhotoAssistantTests */,
+				85FA1CDE2E9DF6AA00A6BB61 /* PhotoAssistantUITests */,
+				85FA1CC32E9DF6A900A6BB61 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		85FA1CC32E9DF6A900A6BB61 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				85FA1CC22E9DF6A900A6BB61 /* PhotoAssistant.app */,
+				85FA1CD12E9DF6AA00A6BB61 /* PhotoAssistantTests.xctest */,
+				85FA1CDB2E9DF6AA00A6BB61 /* PhotoAssistantUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-        85FA1CC12E9DF6A900A6BB61 /* PhotoAssistant */ = {
-            isa = PBXNativeTarget;
-            buildConfigurationList = 85FA1CE52E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistant" */;
-            buildPhases = (
-                85FA1CBE2E9DF6A900A6BB61 /* Sources */,
-                85FA1CBF2E9DF6A900A6BB61 /* Frameworks */,
-                85FA1CC02E9DF6A900A6BB61 /* Resources */,
-            );
-            buildRules = (
-            );
-            dependencies = (
-            );
-            fileSystemSynchronizedGroups = (
-                85FA1CC42E9DF6A900A6BB61 /* PhotoAssistant */,
-            );
-            name = PhotoAssistant;
-            packageProductDependencies = (
-            );
-            productName = PhotoAssistant;
-            productReference = 85FA1CC22E9DF6A900A6BB61 /* PhotoAssistant.app */;
-            productType = "com.apple.product-type.application";
-        };
-        85FA1CD02E9DF6AA00A6BB61 /* PhotoAssistantTests */ = {
-            isa = PBXNativeTarget;
-            buildConfigurationList = 85FA1CE82E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistantTests" */;
-            buildPhases = (
-                85FA1CCD2E9DF6AA00A6BB61 /* Sources */,
-                85FA1CCE2E9DF6AA00A6BB61 /* Frameworks */,
-                85FA1CCF2E9DF6AA00A6BB61 /* Resources */,
-            );
-            buildRules = (
-            );
-            dependencies = (
-                85FA1CD32E9DF6AA00A6BB61 /* PBXTargetDependency */,
-            );
-            fileSystemSynchronizedGroups = (
-                85FA1CD42E9DF6AA00A6BB61 /* PhotoAssistantTests */,
-            );
-            name = PhotoAssistantTests;
-            packageProductDependencies = (
-            );
-            productName = PhotoAssistantTests;
-            productReference = 85FA1CD12E9DF6AA00A6BB61 /* PhotoAssistantTests.xctest */;
-            productType = "com.apple.product-type.bundle.unit-test";
-        };
-        85FA1CDA2E9DF6AA00A6BB61 /* PhotoAssistantUITests */ = {
-            isa = PBXNativeTarget;
-            buildConfigurationList = 85FA1CEB2E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistantUITests" */;
-            buildPhases = (
-                85FA1CD72E9DF6AA00A6BB61 /* Sources */,
-                85FA1CD82E9DF6AA00A6BB61 /* Frameworks */,
-                85FA1CD92E9DF6AA00A6BB61 /* Resources */,
-            );
-            buildRules = (
-            );
-            dependencies = (
-                85FA1CDD2E9DF6AA00A6BB61 /* PBXTargetDependency */,
-            );
-            fileSystemSynchronizedGroups = (
-                85FA1CDE2E9DF6AA00A6BB61 /* PhotoAssistantUITests */,
-            );
-            name = PhotoAssistantUITests;
-            packageProductDependencies = (
-            );
-            productName = PhotoAssistantUITests;
-            productReference = 85FA1CDB2E9DF6AA00A6BB61 /* PhotoAssistantUITests.xctest */;
-            productType = "com.apple.product-type.bundle.ui-testing";
-        };
+		85FA1CC12E9DF6A900A6BB61 /* PhotoAssistant */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 85FA1CE52E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistant" */;
+			buildPhases = (
+				85FA1CBE2E9DF6A900A6BB61 /* Sources */,
+				85FA1CBF2E9DF6A900A6BB61 /* Frameworks */,
+				85FA1CC02E9DF6A900A6BB61 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				85FA1CC42E9DF6A900A6BB61 /* PhotoAssistant */,
+			);
+			name = PhotoAssistant;
+			packageProductDependencies = (
+			);
+			productName = PhotoAssistant;
+			productReference = 85FA1CC22E9DF6A900A6BB61 /* PhotoAssistant.app */;
+			productType = "com.apple.product-type.application";
+		};
+		85FA1CD02E9DF6AA00A6BB61 /* PhotoAssistantTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 85FA1CE82E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistantTests" */;
+			buildPhases = (
+				85FA1CCD2E9DF6AA00A6BB61 /* Sources */,
+				85FA1CCE2E9DF6AA00A6BB61 /* Frameworks */,
+				85FA1CCF2E9DF6AA00A6BB61 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				85FA1CD32E9DF6AA00A6BB61 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				85FA1CD42E9DF6AA00A6BB61 /* PhotoAssistantTests */,
+			);
+			name = PhotoAssistantTests;
+			packageProductDependencies = (
+			);
+			productName = PhotoAssistantTests;
+			productReference = 85FA1CD12E9DF6AA00A6BB61 /* PhotoAssistantTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		85FA1CDA2E9DF6AA00A6BB61 /* PhotoAssistantUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 85FA1CEB2E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistantUITests" */;
+			buildPhases = (
+				85FA1CD72E9DF6AA00A6BB61 /* Sources */,
+				85FA1CD82E9DF6AA00A6BB61 /* Frameworks */,
+				85FA1CD92E9DF6AA00A6BB61 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				85FA1CDD2E9DF6AA00A6BB61 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				85FA1CDE2E9DF6AA00A6BB61 /* PhotoAssistantUITests */,
+			);
+			name = PhotoAssistantUITests;
+			packageProductDependencies = (
+			);
+			productName = PhotoAssistantUITests;
+			productReference = 85FA1CDB2E9DF6AA00A6BB61 /* PhotoAssistantUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-        85FA1CBA2E9DF6A800A6BB61 /* Project object */ = {
-            isa = PBXProject;
-            attributes = {
-                BuildIndependentTargetsInParallel = 1;
-                LastSwiftUpdateCheck = 2600;
-                LastUpgradeCheck = 2600;
-                TargetAttributes = {
-                    85FA1CC12E9DF6A900A6BB61 = {
-                        CreatedOnToolsVersion = 26.0.1;
-                    };
-                    85FA1CD02E9DF6AA00A6BB61 = {
-                        CreatedOnToolsVersion = 26.0.1;
-                        TestTargetID = 85FA1CC12E9DF6A900A6BB61;
-                    };
-                    85FA1CDA2E9DF6AA00A6BB61 = {
-                        CreatedOnToolsVersion = 26.0.1;
-                        TestTargetID = 85FA1CC12E9DF6A900A6BB61;
-                    };
-                };
-            };
-            buildConfigurationList = 85FA1CBD2E9DF6A800A6BB61 /* Build configuration list for PBXProject "PhotoAssistant" */;
-            developmentRegion = en;
-            hasScannedForEncodings = 0;
-            knownRegions = (
-                en,
-                Base,
-            );
-            mainGroup = 85FA1CB92E9DF6A800A6BB61;
-            minimizedProjectReferenceProxies = 1;
-            preferredProjectObjectVersion = 77;
-            productRefGroup = 85FA1CC32E9DF6A900A6BB61 /* Products */;
-            projectDirPath = "";
-            projectRoot = "";
-            targets = (
-                85FA1CC12E9DF6A900A6BB61 /* PhotoAssistant */,
-                85FA1CD02E9DF6AA00A6BB61 /* PhotoAssistantTests */,
-                85FA1CDA2E9DF6AA00A6BB61 /* PhotoAssistantUITests */,
-            );
-        };
+		85FA1CBA2E9DF6A800A6BB61 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					85FA1CC12E9DF6A900A6BB61 = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					85FA1CD02E9DF6AA00A6BB61 = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 85FA1CC12E9DF6A900A6BB61;
+					};
+					85FA1CDA2E9DF6AA00A6BB61 = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 85FA1CC12E9DF6A900A6BB61;
+					};
+				};
+			};
+			buildConfigurationList = 85FA1CBD2E9DF6A800A6BB61 /* Build configuration list for PBXProject "PhotoAssistant" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 85FA1CB92E9DF6A800A6BB61;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 85FA1CC32E9DF6A900A6BB61 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				85FA1CC12E9DF6A900A6BB61 /* PhotoAssistant */,
+				85FA1CD02E9DF6AA00A6BB61 /* PhotoAssistantTests */,
+				85FA1CDA2E9DF6AA00A6BB61 /* PhotoAssistantUITests */,
+			);
+		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-        85FA1CC02E9DF6A900A6BB61 /* Resources */ = {
-            isa = PBXResourcesBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
-        85FA1CCF2E9DF6AA00A6BB61 /* Resources */ = {
-            isa = PBXResourcesBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
-        85FA1CD92E9DF6AA00A6BB61 /* Resources */ = {
-            isa = PBXResourcesBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
+		85FA1CC02E9DF6A900A6BB61 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85FA1CCF2E9DF6AA00A6BB61 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85FA1CD92E9DF6AA00A6BB61 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-        85FA1CBE2E9DF6A900A6BB61 /* Sources */ = {
-            isa = PBXSourcesBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
-        85FA1CCD2E9DF6AA00A6BB61 /* Sources */ = {
-            isa = PBXSourcesBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
-        85FA1CD72E9DF6AA00A6BB61 /* Sources */ = {
-            isa = PBXSourcesBuildPhase;
-            buildActionMask = 2147483647;
-            files = (
-            );
-            runOnlyForDeploymentPostprocessing = 0;
-        };
+		85FA1CBE2E9DF6A900A6BB61 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85FA1CCD2E9DF6AA00A6BB61 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85FA1CD72E9DF6AA00A6BB61 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-        85FA1CD32E9DF6AA00A6BB61 /* PBXTargetDependency */ = {
-            isa = PBXTargetDependency;
-            target = 85FA1CC12E9DF6A900A6BB61 /* PhotoAssistant */;
-            targetProxy = 85FA1CD22E9DF6AA00A6BB61 /* PBXContainerItemProxy */;
-        };
-        85FA1CDD2E9DF6AA00A6BB61 /* PBXTargetDependency */ = {
-            isa = PBXTargetDependency;
-            target = 85FA1CC12E9DF6A900A6BB61 /* PhotoAssistant */;
-            targetProxy = 85FA1CDC2E9DF6AA00A6BB61 /* PBXContainerItemProxy */;
-        };
+		85FA1CD32E9DF6AA00A6BB61 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 85FA1CC12E9DF6A900A6BB61 /* PhotoAssistant */;
+			targetProxy = 85FA1CD22E9DF6AA00A6BB61 /* PBXContainerItemProxy */;
+		};
+		85FA1CDD2E9DF6AA00A6BB61 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 85FA1CC12E9DF6A900A6BB61 /* PhotoAssistant */;
+			targetProxy = 85FA1CDC2E9DF6AA00A6BB61 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-        85FA1CE32E9DF6AA00A6BB61 /* Debug */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                ALWAYS_SEARCH_USER_PATHS = NO;
-                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-                CLANG_ANALYZER_NONNULL = YES;
-                CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-                CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-                CLANG_ENABLE_MODULES = YES;
-                CLANG_ENABLE_OBJC_ARC = YES;
-                CLANG_ENABLE_OBJC_WEAK = YES;
-                CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-                CLANG_WARN_BOOL_CONVERSION = YES;
-                CLANG_WARN_COMMA = YES;
-                CLANG_WARN_CONSTANT_CONVERSION = YES;
-                CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-                CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-                CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-                CLANG_WARN_EMPTY_BODY = YES;
-                CLANG_WARN_ENUM_CONVERSION = YES;
-                CLANG_WARN_INFINITE_RECURSION = YES;
-                CLANG_WARN_INT_CONVERSION = YES;
-                CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-                CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-                CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-                CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-                CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-                CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-                CLANG_WARN_STRICT_PROTOTYPES = YES;
-                CLANG_WARN_SUSPICIOUS_MOVE = YES;
-                CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-                CLANG_WARN_UNREACHABLE_CODE = YES;
-                CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-                COPY_PHASE_STRIP = NO;
-                DEBUG_INFORMATION_FORMAT = dwarf;
-                DEVELOPMENT_TEAM = 2NNJLL7727;
-                ENABLE_STRICT_OBJC_MSGSEND = YES;
-                ENABLE_TESTABILITY = YES;
-                ENABLE_USER_SCRIPT_SANDBOXING = YES;
-                GCC_C_LANGUAGE_STANDARD = gnu17;
-                GCC_DYNAMIC_NO_PIC = NO;
-                GCC_NO_COMMON_BLOCKS = YES;
-                GCC_OPTIMIZATION_LEVEL = 0;
-                GCC_PREPROCESSOR_DEFINITIONS = (
-                    "DEBUG=1",
-                    "$(inherited)",
-                );
-                GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-                GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-                GCC_WARN_UNDECLARED_SELECTOR = YES;
-                GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-                GCC_WARN_UNUSED_FUNCTION = YES;
-                GCC_WARN_UNUSED_VARIABLE = YES;
-                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-                MTL_FAST_MATH = YES;
-                ONLY_ACTIVE_ARCH = YES;
-                SDKROOT = iphoneos;
-                SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-            };
-            name = Debug;
-        };
-        85FA1CE42E9DF6AA00A6BB61 /* Release */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                ALWAYS_SEARCH_USER_PATHS = NO;
-                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-                CLANG_ANALYZER_NONNULL = YES;
-                CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-                CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-                CLANG_ENABLE_MODULES = YES;
-                CLANG_ENABLE_OBJC_ARC = YES;
-                CLANG_ENABLE_OBJC_WEAK = YES;
-                CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-                CLANG_WARN_BOOL_CONVERSION = YES;
-                CLANG_WARN_COMMA = YES;
-                CLANG_WARN_CONSTANT_CONVERSION = YES;
-                CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-                CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-                CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-                CLANG_WARN_EMPTY_BODY = YES;
-                CLANG_WARN_ENUM_CONVERSION = YES;
-                CLANG_WARN_INFINITE_RECURSION = YES;
-                CLANG_WARN_INT_CONVERSION = YES;
-                CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-                CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-                CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-                CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-                CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-                CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-                CLANG_WARN_STRICT_PROTOTYPES = YES;
-                CLANG_WARN_SUSPICIOUS_MOVE = YES;
-                CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-                CLANG_WARN_UNREACHABLE_CODE = YES;
-                CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-                COPY_PHASE_STRIP = NO;
-                DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-                DEVELOPMENT_TEAM = 2NNJLL7727;
-                ENABLE_NS_ASSERTIONS = NO;
-                ENABLE_STRICT_OBJC_MSGSEND = YES;
-                ENABLE_USER_SCRIPT_SANDBOXING = YES;
-                GCC_C_LANGUAGE_STANDARD = gnu17;
-                GCC_NO_COMMON_BLOCKS = YES;
-                GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-                GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-                GCC_WARN_UNDECLARED_SELECTOR = YES;
-                GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-                GCC_WARN_UNUSED_FUNCTION = YES;
-                GCC_WARN_UNUSED_VARIABLE = YES;
-                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                MTL_ENABLE_DEBUG_INFO = NO;
-                MTL_FAST_MATH = YES;
-                SDKROOT = iphoneos;
-                SWIFT_COMPILATION_MODE = wholemodule;
-                VALIDATE_PRODUCT = YES;
-            };
-            name = Release;
-        };
-        85FA1CE62E9DF6AA00A6BB61 /* Debug */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-                CODE_SIGN_STYLE = Automatic;
-                CURRENT_PROJECT_VERSION = 1;
-                DEVELOPMENT_TEAM = 2NNJLL7727;
-                ENABLE_PREVIEWS = YES;
-                GENERATE_INFOPLIST_FILE = YES;
-                INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PhotoAssistant needs location access to add GPS coordinates and altitude to your photos for better organization and metadata.";
-                INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-                INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-                LD_RUNPATH_SEARCH_PATHS = (
-                    "$(inherited)",
-                    "@executable_path/Frameworks",
-                );
-                MARKETING_VERSION = 1.0;
-                PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistant;
-                PRODUCT_NAME = "$(TARGET_NAME)";
-                STRING_CATALOG_GENERATE_SYMBOLS = YES;
-                SWIFT_APPROACHABLE_CONCURRENCY = YES;
-                SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-                SWIFT_EMIT_LOC_STRINGS = YES;
-                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
-            };
-            name = Debug;
-        };
-        85FA1CE72E9DF6AA00A6BB61 /* Release */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-                CODE_SIGN_STYLE = Automatic;
-                CURRENT_PROJECT_VERSION = 1;
-                DEVELOPMENT_TEAM = 2NNJLL7727;
-                ENABLE_PREVIEWS = YES;
-                GENERATE_INFOPLIST_FILE = YES;
-                INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PhotoAssistant needs location access to add GPS coordinates and altitude to your photos for better organization and metadata.";
-                INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-                INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-                LD_RUNPATH_SEARCH_PATHS = (
-                    "$(inherited)",
-                    "@executable_path/Frameworks",
-                );
-                MARKETING_VERSION = 1.0;
-                PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistant;
-                PRODUCT_NAME = "$(TARGET_NAME)";
-                STRING_CATALOG_GENERATE_SYMBOLS = YES;
-                SWIFT_APPROACHABLE_CONCURRENCY = YES;
-                SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-                SWIFT_EMIT_LOC_STRINGS = YES;
-                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
-            };
-            name = Release;
-        };
-        85FA1CE92E9DF6AA00A6BB61 /* Debug */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                BUNDLE_LOADER = "$(TEST_HOST)";
-                CODE_SIGN_STYLE = Automatic;
-                CURRENT_PROJECT_VERSION = 1;
-                DEVELOPMENT_TEAM = 2NNJLL7727;
-                GENERATE_INFOPLIST_FILE = YES;
-                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-                MARKETING_VERSION = 1.0;
-                PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistantTests;
-                PRODUCT_NAME = "$(TARGET_NAME)";
-                STRING_CATALOG_GENERATE_SYMBOLS = NO;
-                SWIFT_APPROACHABLE_CONCURRENCY = YES;
-                SWIFT_EMIT_LOC_STRINGS = NO;
-                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
-                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhotoAssistant.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PhotoAssistant";
-            };
-            name = Debug;
-        };
-        85FA1CEA2E9DF6AA00A6BB61 /* Release */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                BUNDLE_LOADER = "$(TEST_HOST)";
-                CODE_SIGN_STYLE = Automatic;
-                CURRENT_PROJECT_VERSION = 1;
-                DEVELOPMENT_TEAM = 2NNJLL7727;
-                GENERATE_INFOPLIST_FILE = YES;
-                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-                MARKETING_VERSION = 1.0;
-                PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistantTests;
-                PRODUCT_NAME = "$(TARGET_NAME)";
-                STRING_CATALOG_GENERATE_SYMBOLS = NO;
-                SWIFT_APPROACHABLE_CONCURRENCY = YES;
-                SWIFT_EMIT_LOC_STRINGS = NO;
-                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
-                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhotoAssistant.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PhotoAssistant";
-            };
-            name = Release;
-        };
-        85FA1CEC2E9DF6AA00A6BB61 /* Debug */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                CODE_SIGN_STYLE = Automatic;
-                CURRENT_PROJECT_VERSION = 1;
-                DEVELOPMENT_TEAM = 2NNJLL7727;
-                GENERATE_INFOPLIST_FILE = YES;
-                MARKETING_VERSION = 1.0;
-                PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistantUITests;
-                PRODUCT_NAME = "$(TARGET_NAME)";
-                STRING_CATALOG_GENERATE_SYMBOLS = NO;
-                SWIFT_APPROACHABLE_CONCURRENCY = YES;
-                SWIFT_EMIT_LOC_STRINGS = NO;
-                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
-                TEST_TARGET_NAME = PhotoAssistant;
-            };
-            name = Debug;
-        };
-        85FA1CED2E9DF6AA00A6BB61 /* Release */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                CODE_SIGN_STYLE = Automatic;
-                CURRENT_PROJECT_VERSION = 1;
-                DEVELOPMENT_TEAM = 2NNJLL7727;
-                GENERATE_INFOPLIST_FILE = YES;
-                MARKETING_VERSION = 1.0;
-                PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistantUITests;
-                PRODUCT_NAME = "$(TARGET_NAME)";
-                STRING_CATALOG_GENERATE_SYMBOLS = NO;
-                SWIFT_APPROACHABLE_CONCURRENCY = YES;
-                SWIFT_EMIT_LOC_STRINGS = NO;
-                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
-                TEST_TARGET_NAME = PhotoAssistant;
-            };
-            name = Release;
-        };
+		85FA1CE32E9DF6AA00A6BB61 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 2NNJLL7727;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		85FA1CE42E9DF6AA00A6BB61 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 2NNJLL7727;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		85FA1CE62E9DF6AA00A6BB61 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2NNJLL7727;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "PhotoAssistant needs camera access to take photos with embedded GPS coordinates, altitude, and heading metadata for better organization and geotagging.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PhotoAssistant needs location access to add GPS coordinates and altitude to your photos for better organization and metadata.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Needs access to camera roll to save the photo just taken.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistant;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		85FA1CE72E9DF6AA00A6BB61 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2NNJLL7727;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "PhotoAssistant needs camera access to take photos with embedded GPS coordinates, altitude, and heading metadata for better organization and geotagging.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PhotoAssistant needs location access to add GPS coordinates and altitude to your photos for better organization and metadata.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Needs access to camera roll to save the photo just taken.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistant;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		85FA1CE92E9DF6AA00A6BB61 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2NNJLL7727;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistantTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhotoAssistant.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PhotoAssistant";
+			};
+			name = Debug;
+		};
+		85FA1CEA2E9DF6AA00A6BB61 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2NNJLL7727;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistantTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhotoAssistant.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PhotoAssistant";
+			};
+			name = Release;
+		};
+		85FA1CEC2E9DF6AA00A6BB61 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2NNJLL7727;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistantUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = PhotoAssistant;
+			};
+			name = Debug;
+		};
+		85FA1CED2E9DF6AA00A6BB61 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2NNJLL7727;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AlwaysPhotographing.PhotoAssistantUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = PhotoAssistant;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-        85FA1CBD2E9DF6A800A6BB61 /* Build configuration list for PBXProject "PhotoAssistant" */ = {
-            isa = XCConfigurationList;
-            buildConfigurations = (
-                85FA1CE32E9DF6AA00A6BB61 /* Debug */,
-                85FA1CE42E9DF6AA00A6BB61 /* Release */,
-            );
-            defaultConfigurationIsVisible = 0;
-            defaultConfigurationName = Release;
-        };
-        85FA1CE52E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistant" */ = {
-            isa = XCConfigurationList;
-            buildConfigurations = (
-                85FA1CE62E9DF6AA00A6BB61 /* Debug */,
-                85FA1CE72E9DF6AA00A6BB61 /* Release */,
-            );
-            defaultConfigurationIsVisible = 0;
-            defaultConfigurationName = Release;
-        };
-        85FA1CE82E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistantTests" */ = {
-            isa = XCConfigurationList;
-            buildConfigurations = (
-                85FA1CE92E9DF6AA00A6BB61 /* Debug */,
-                85FA1CEA2E9DF6AA00A6BB61 /* Release */,
-            );
-            defaultConfigurationIsVisible = 0;
-            defaultConfigurationName = Release;
-        };
-        85FA1CEB2E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistantUITests" */ = {
-            isa = XCConfigurationList;
-            buildConfigurations = (
-                85FA1CEC2E9DF6AA00A6BB61 /* Debug */,
-                85FA1CED2E9DF6AA00A6BB61 /* Release */,
-            );
-            defaultConfigurationIsVisible = 0;
-            defaultConfigurationName = Release;
-        };
+		85FA1CBD2E9DF6A800A6BB61 /* Build configuration list for PBXProject "PhotoAssistant" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				85FA1CE32E9DF6AA00A6BB61 /* Debug */,
+				85FA1CE42E9DF6AA00A6BB61 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		85FA1CE52E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistant" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				85FA1CE62E9DF6AA00A6BB61 /* Debug */,
+				85FA1CE72E9DF6AA00A6BB61 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		85FA1CE82E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistantTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				85FA1CE92E9DF6AA00A6BB61 /* Debug */,
+				85FA1CEA2E9DF6AA00A6BB61 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		85FA1CEB2E9DF6AA00A6BB61 /* Build configuration list for PBXNativeTarget "PhotoAssistantUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				85FA1CEC2E9DF6AA00A6BB61 /* Debug */,
+				85FA1CED2E9DF6AA00A6BB61 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
-    };
-    rootObject = 85FA1CBA2E9DF6A800A6BB61 /* Project object */;
+	};
+	rootObject = 85FA1CBA2E9DF6A800A6BB61 /* Project object */;
 }
