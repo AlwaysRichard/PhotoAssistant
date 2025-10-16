@@ -44,7 +44,6 @@ struct CameraView: View {
     @StateObject private var cameraManager = CameraManager()
     @State private var showingLocationPermissionAlert = false
     @State private var showingInitialLocationRequest = false
-    @State private var locationPermissionChecked = false
     @State private var cameraStarted = false
     
     var body: some View {
@@ -167,38 +166,36 @@ struct CameraView: View {
         }
         .onChange(of: cameraManager.locationAuthorizationStatus) { _, newStatus in
             // React to location permission changes
-            if locationPermissionChecked && (newStatus == .denied || newStatus == .restricted) {
+            if newStatus == .denied || newStatus == .restricted {
                 showingLocationPermissionAlert = true
             }
         }
     }
     
     private func requestLocationPermissionIfNeeded() {
-        let locationStatus = CLLocationManager().authorizationStatus
-        print("Current location status: \(locationStatus.rawValue)")
+        let locationStatus = cameraManager.locationAuthorizationStatus
+        print("Current location status on startup: \(locationStatus.rawValue)")
         
         switch locationStatus {
         case .notDetermined:
-            // Show alert explaining why we need location before requesting
-            print("Location permission not determined, showing explanation")
+            // Show explanation and request permission
+            print("Location permission not determined, showing explanation alert")
             showingInitialLocationRequest = true
         case .denied, .restricted:
-            // Permission was denied, show alert to go to settings
-            print("Location access denied, showing settings alert")
+            // Permission was previously denied, show settings alert
+            print("Location access denied/restricted, showing settings alert")
             showingLocationPermissionAlert = true
             // Start camera anyway for users who want to use without location
             startCameraIfNotStarted()
         case .authorizedWhenInUse, .authorizedAlways:
-            // Permission granted, start everything
+            // Permission already granted, start everything normally
             print("Location permission already granted, starting camera")
             startCameraIfNotStarted()
         @unknown default:
-            // Unknown status, show explanation
+            // Unknown status, treat as not determined
             print("Unknown location permission status, showing explanation")
             showingInitialLocationRequest = true
         }
-        
-        locationPermissionChecked = true
     }
     
     private func startCameraIfNotStarted() {
@@ -753,17 +750,38 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
         let orientedImage = applyProperOrientation(to: image)
         let imageWithBanner = addLocationBanner(to: orientedImage)
         
-        // Save only the photo with banner to photo library
+        // Convert the final image back to data to preserve metadata
+        guard let finalImageData = imageWithBanner.jpegData(compressionQuality: 0.95) else {
+            print("Error: could not convert final image to JPEG data")
+            return
+        }
+        
+        // Re-add metadata to the final image data (since adding banner removes it)
+        let finalImageWithMetadata = addEXIFMetadata(to: finalImageData)
+        
+        // Save the photo with metadata to photo library
         Task {
             let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
             if status == .authorized {
                 do {
                     try await PHPhotoLibrary.shared().performChanges {
-                        // Save only the version with visual banner overlay
-                        PHAssetCreationRequest.creationRequestForAsset(from: imageWithBanner)
+                        // Create the asset creation request
+                        let creationRequest = PHAssetCreationRequest.forAsset()
+                        
+                        // Add the image data with metadata
+                        creationRequest.addResource(with: .photo, data: finalImageWithMetadata, options: nil)
+                        
+                        // Set location data directly on the asset if available
+                        if let location = self.currentLocation {
+                            creationRequest.location = location
+                            print("Set location directly on PHAsset: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+                        }
+                        
+                        // Set creation date
+                        creationRequest.creationDate = Date()
                     }
                     DispatchQueue.main.async {
-                        print("Photo saved successfully with banner and EXIF metadata")
+                        print("Photo saved successfully with GPS metadata and banner")
                     }
                 } catch {
                     DispatchQueue.main.async {
@@ -825,6 +843,8 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
             metadata = existingMetadata
         }
         
+        print("Original metadata keys: \(metadata.keys)")
+        
         // Add GPS metadata if location is available
         if let location = currentLocation {
             let gpsDict = createGPSMetadata(location: location, heading: currentHeading)
@@ -833,23 +853,14 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
             let latitude = location.coordinate.latitude
             let longitude = location.coordinate.longitude
             print("Added GPS metadata: lat=\(latitude), lon=\(longitude), alt=\(location.altitude)")
+            print("GPS dictionary contents: \(gpsDict)")
+        } else {
+            print("Warning: No location data available for GPS metadata")
         }
         
-        // Add proper orientation metadata based on device orientation
-        let orientationValue: Int
-        switch currentOrientation {
-        case .portrait:
-            orientationValue = 6 // Rotated 90° CCW (Right side up when viewed)
-        case .portraitUpsideDown:
-            orientationValue = 8 // Rotated 90° CW
-        case .landscapeLeft:
-            orientationValue = 1 // Normal orientation (landscape left is the natural camera orientation)
-        case .landscapeRight:
-            orientationValue = 3 // Rotated 180° (to correct upside down in landscape right)
-        default:
-            orientationValue = 6 // Default to portrait
-        }
-        metadata[kCGImagePropertyOrientation as String] = orientationValue
+        // EXIF orientation metadata feature disabled
+        // The orientation metadata is not being set to allow photo viewers to handle orientation naturally
+        print("EXIF orientation metadata disabled - letting photo viewers handle orientation naturally")
         
         // Add EXIF metadata
         var exifDict: [String: Any] = metadata[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
@@ -873,23 +884,38 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
         // Add creation date
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        exifDict[kCGImagePropertyExifDateTimeOriginal as String] = dateFormatter.string(from: Date())
-        exifDict[kCGImagePropertyExifDateTimeDigitized as String] = dateFormatter.string(from: Date())
+        let currentDate = Date()
+        exifDict[kCGImagePropertyExifDateTimeOriginal as String] = dateFormatter.string(from: currentDate)
+        exifDict[kCGImagePropertyExifDateTimeDigitized as String] = dateFormatter.string(from: currentDate)
         
         metadata[kCGImagePropertyExifDictionary as String] = exifDict
         
         // Add TIFF metadata
         var tiffDict: [String: Any] = metadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] ?? [:]
         tiffDict[kCGImagePropertyTIFFSoftware as String] = "PhotoAssistant v1.0"
-        tiffDict[kCGImagePropertyTIFFDateTime as String] = dateFormatter.string(from: Date())
+        tiffDict[kCGImagePropertyTIFFDateTime as String] = dateFormatter.string(from: currentDate)
         metadata[kCGImagePropertyTIFFDictionary as String] = tiffDict
+        
+        print("Final metadata keys before writing: \(metadata.keys)")
+        print("GPS dictionary exists: \(metadata[kCGImagePropertyGPSDictionary as String] != nil)")
         
         // Copy image with new metadata
         CGImageDestinationAddImageFromSource(destination, source, 0, metadata as CFDictionary)
         
         if CGImageDestinationFinalize(destination) {
             print("Successfully added EXIF metadata to image")
-            print("Metadata keys added: \(metadata.keys)")
+            
+            // Verify the metadata was actually written
+            if let verifySource = CGImageSourceCreateWithData(mutableData, nil),
+               let verifyMetadata = CGImageSourceCopyPropertiesAtIndex(verifySource, 0, nil) as? [String: Any] {
+                print("Verification - Final image metadata keys: \(verifyMetadata.keys)")
+                if let gpsData = verifyMetadata[kCGImagePropertyGPSDictionary as String] {
+                    print("Verification - GPS metadata successfully embedded: \(gpsData)")
+                } else {
+                    print("Warning - GPS metadata not found in final image!")
+                }
+            }
+            
             return mutableData as Data
         } else {
             print("Error: Failed to finalize image with metadata")
@@ -993,36 +1019,74 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
     private func createGPSMetadata(location: CLLocation, heading: CLHeading?) -> [String: Any] {
         var gpsDict: [String: Any] = [:]
         
-        // Latitude
-        gpsDict[kCGImagePropertyGPSLatitude as String] = abs(location.coordinate.latitude)
-        gpsDict[kCGImagePropertyGPSLatitudeRef as String] = (location.coordinate.latitude < 0.0) ? "S" : "N"
+        print("Creating GPS metadata for location: \(location)")
         
-        // Longitude
-        gpsDict[kCGImagePropertyGPSLongitude as String] = abs(location.coordinate.longitude)
-        gpsDict[kCGImagePropertyGPSLongitudeRef as String] = (location.coordinate.longitude < 0.0) ? "W" : "E"
+        // Latitude - ensure proper numeric format
+        let latitude = location.coordinate.latitude
+        gpsDict[kCGImagePropertyGPSLatitude as String] = NSNumber(value: abs(latitude))
+        gpsDict[kCGImagePropertyGPSLatitudeRef as String] = (latitude < 0.0) ? "S" : "N"
+        print("GPS Latitude: \(abs(latitude)) \(latitude < 0.0 ? "S" : "N")")
         
-        // Elevation (Altitude)
-        gpsDict[kCGImagePropertyGPSAltitude as String] = abs(location.altitude)
-        gpsDict[kCGImagePropertyGPSAltitudeRef as String] = (location.altitude < 0) ? 1 : 0 // 0 = sea level, 1 = below sea level
+        // Longitude - ensure proper numeric format
+        let longitude = location.coordinate.longitude
+        gpsDict[kCGImagePropertyGPSLongitude as String] = NSNumber(value: abs(longitude))
+        gpsDict[kCGImagePropertyGPSLongitudeRef as String] = (longitude < 0.0) ? "W" : "E"
+        print("GPS Longitude: \(abs(longitude)) \(longitude < 0.0 ? "W" : "E")")
         
-        // True Heading (Image Direction) - only if heading is available and valid
-        if let heading = heading, heading.trueHeading >= 0 {
-            gpsDict[kCGImagePropertyGPSImgDirection as String] = heading.trueHeading
-            gpsDict[kCGImagePropertyGPSImgDirectionRef as String] = "T" // 'T' for True North
-        } else if let heading = heading {
-            // Fall back to magnetic heading if true heading not available
-            gpsDict[kCGImagePropertyGPSImgDirection as String] = heading.magneticHeading
-            gpsDict[kCGImagePropertyGPSImgDirectionRef as String] = "M" // 'M' for Magnetic North
+        // Elevation (Altitude) - ensure proper numeric format
+        let altitude = location.altitude
+        gpsDict[kCGImagePropertyGPSAltitude as String] = NSNumber(value: abs(altitude))
+        gpsDict[kCGImagePropertyGPSAltitudeRef as String] = NSNumber(value: altitude < 0 ? 1 : 0) // 0 = above sea level, 1 = below sea level
+        print("GPS Altitude: \(abs(altitude))m \(altitude < 0 ? "below" : "above") sea level")
+        
+        // Horizontal accuracy
+        if location.horizontalAccuracy >= 0 {
+            gpsDict[kCGImagePropertyGPSHPositioningError as String] = NSNumber(value: location.horizontalAccuracy)
+            print("GPS Horizontal Accuracy: \(location.horizontalAccuracy)m")
         }
         
-        // GPS Date and Time Stamps
-        gpsDict[kCGImagePropertyGPSTimeStamp as String] = DateFormatter.gpsTimeStampFormatter.string(from: location.timestamp)
-        gpsDict[kCGImagePropertyGPSDateStamp as String] = DateFormatter.gpsDateStampFormatter.string(from: location.timestamp)
+        // Vertical accuracy for altitude
+        if location.verticalAccuracy >= 0 {
+            // Store vertical accuracy in GPS processing method or user comment since there's no direct EXIF field
+            print("GPS Vertical Accuracy: \(location.verticalAccuracy)m")
+        }
+        
+        // True Heading (Image Direction) - only if heading is available and valid
+        if let heading = heading {
+            if heading.trueHeading >= 0 {
+                gpsDict[kCGImagePropertyGPSImgDirection as String] = NSNumber(value: heading.trueHeading)
+                gpsDict[kCGImagePropertyGPSImgDirectionRef as String] = "T" // 'T' for True North
+                print("GPS True Heading: \(heading.trueHeading)°")
+            } else if heading.magneticHeading >= 0 {
+                // Fall back to magnetic heading if true heading not available
+                gpsDict[kCGImagePropertyGPSImgDirection as String] = NSNumber(value: heading.magneticHeading)
+                gpsDict[kCGImagePropertyGPSImgDirectionRef as String] = "M" // 'M' for Magnetic North
+                print("GPS Magnetic Heading: \(heading.magneticHeading)°")
+            }
+            
+            // Add heading accuracy if available
+            if heading.headingAccuracy >= 0 {
+                print("GPS Heading Accuracy: ±\(heading.headingAccuracy)°")
+            }
+        } else {
+            print("No heading data available for GPS metadata")
+        }
+        
+        // GPS Date and Time Stamps - use location timestamp for accuracy
+        let locationTimestamp = location.timestamp
+        gpsDict[kCGImagePropertyGPSTimeStamp as String] = DateFormatter.gpsTimeStampFormatter.string(from: locationTimestamp)
+        gpsDict[kCGImagePropertyGPSDateStamp as String] = DateFormatter.gpsDateStampFormatter.string(from: locationTimestamp)
+        print("GPS Timestamp: \(locationTimestamp)")
         
         // Additional standard GPS metadata
-        gpsDict[kCGImagePropertyGPSHPositioningError as String] = location.horizontalAccuracy
         gpsDict[kCGImagePropertyGPSProcessingMethod as String] = "GPS"
         gpsDict[kCGImagePropertyGPSMapDatum as String] = "WGS-84"
+        
+        // GPS Version - specify which GPS specification we're following
+        gpsDict[kCGImagePropertyGPSVersion as String] = "2.2.0.0"
+        
+        print("GPS metadata dictionary created with \(gpsDict.count) entries")
+        print("GPS dictionary keys: \(gpsDict.keys.sorted())")
         
         return gpsDict
     }
