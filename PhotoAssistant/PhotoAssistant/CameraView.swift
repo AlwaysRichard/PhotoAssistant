@@ -43,7 +43,9 @@ enum CameraLens: String, CaseIterable {
 struct CameraView: View {
     @StateObject private var cameraManager = CameraManager()
     @State private var showingLocationPermissionAlert = false
+    @State private var showingInitialLocationRequest = false
     @State private var locationPermissionChecked = false
+    @State private var cameraStarted = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -132,7 +134,7 @@ struct CameraView: View {
         }
         .onAppear {
             print("CameraView appeared")
-            checkPermissionsAndStartCamera()
+            requestLocationPermissionIfNeeded()
         }
         .onDisappear {
             cameraManager.stopCamera()
@@ -147,11 +149,21 @@ struct CameraView: View {
                 }
             }
             Button("Continue Without Location", role: .destructive) {
-                // User chose to continue without location services
-                // Camera is already running, no need to restart
+                startCameraIfNotStarted()
             }
         } message: {
             Text("PhotoAssistant needs location access to add GPS coordinates, addresses, and heading information to your photos. Please enable location services in Settings > Privacy & Security > Location Services > PhotoAssistant.")
+        }
+        .alert("Enable Location Services", isPresented: $showingInitialLocationRequest) {
+            Button("Allow Location") {
+                cameraManager.requestLocationPermission()
+                startCameraIfNotStarted()
+            }
+            Button("Skip") {
+                startCameraIfNotStarted()
+            }
+        } message: {
+            Text("PhotoAssistant can add GPS coordinates, address, altitude, and compass heading to your photos. This helps with organizing and geotagging your images. Location data is only used for photo metadata and is not shared.")
         }
         .onChange(of: cameraManager.locationAuthorizationStatus) { _, newStatus in
             // React to location permission changes
@@ -161,35 +173,39 @@ struct CameraView: View {
         }
     }
     
-    private func checkPermissionsAndStartCamera() {
-        let locationStatus = cameraManager.locationAuthorizationStatus
+    private func requestLocationPermissionIfNeeded() {
+        let locationStatus = CLLocationManager().authorizationStatus
+        print("Current location status: \(locationStatus.rawValue)")
         
         switch locationStatus {
         case .notDetermined:
-            // Request permissions - this will automatically trigger location permission request
-            print("Location permission not determined, requesting permissions...")
-            cameraManager.requestCameraPermissions()
-            cameraManager.startCamera()
+            // Show alert explaining why we need location before requesting
+            print("Location permission not determined, showing explanation")
+            showingInitialLocationRequest = true
         case .denied, .restricted:
-            // Show alert to user about location being disabled, but still start camera
-            print("Location access denied, showing alert to user")
+            // Permission was denied, show alert to go to settings
+            print("Location access denied, showing settings alert")
             showingLocationPermissionAlert = true
-            // Still start camera for users who want to use it without location
-            cameraManager.requestCameraPermissions()
-            cameraManager.startCamera()
+            // Start camera anyway for users who want to use without location
+            startCameraIfNotStarted()
         case .authorizedWhenInUse, .authorizedAlways:
-            // All permissions good, start normally
+            // Permission granted, start everything
             print("Location permission already granted, starting camera")
-            cameraManager.requestCameraPermissions()
-            cameraManager.startCamera()
+            startCameraIfNotStarted()
         @unknown default:
-            // Unknown status, start camera but may show alert later
-            print("Unknown location permission status, starting camera")
-            cameraManager.requestCameraPermissions()
-            cameraManager.startCamera()
+            // Unknown status, show explanation
+            print("Unknown location permission status, showing explanation")
+            showingInitialLocationRequest = true
         }
         
         locationPermissionChecked = true
+    }
+    
+    private func startCameraIfNotStarted() {
+        guard !cameraStarted else { return }
+        cameraStarted = true
+        cameraManager.requestCameraPermissions()
+        cameraManager.startCamera()
     }
     
     // Format vertical angle relative to horizon (0° = level)
@@ -300,6 +316,11 @@ class CameraManager: NSObject, ObservableObject {
                 }
             }
         }
+    }
+    
+    func requestLocationPermission() {
+        print("Explicitly requesting location permission...")
+        locationManager.requestWhenInUseAuthorization()
     }
     
     private func setupLocationManager() {
