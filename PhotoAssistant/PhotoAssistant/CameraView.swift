@@ -13,6 +13,8 @@ import Photos
 import UIKit
 import Combine
 import ImageIO
+import UniformTypeIdentifiers
+import MapKit
 
 // MARK: - Camera Lens Types
 enum CameraLens: String, CaseIterable {
@@ -45,6 +47,7 @@ struct CameraView: View {
     @State private var showingLocationPermissionAlert = false
     @State private var showingInitialLocationRequest = false
     @State private var cameraStarted = false
+    @State private var currentOrientation: UIDeviceOrientation = .portrait
     var onBack: (() -> Void)? = nil
     
     var body: some View {
@@ -58,7 +61,7 @@ struct CameraView: View {
                 CameraPreviewView(cameraManager: cameraManager, size: geometry.size)
                     .ignoresSafeArea()
                 
-                // Back button in upper left corner
+                // Back button - positioned based on orientation
                 VStack {
                     HStack {
                         if let onBack = onBack {
@@ -84,77 +87,168 @@ struct CameraView: View {
                     Spacer()
                 }
                 
-                VStack {
-                    Spacer()
-                    
-                    VStack(spacing: 16) {
-                        // Shutter button with lens selector at upper right
-                        ZStack {
-                            // Shutter button (centered)
-                            Button(action: {
-                                cameraManager.capturePhoto()
-                            }) {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 70, height: 70)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.black, lineWidth: 2)
-                                            .frame(width: 60, height: 60)
-                                    )
-                            }
+                // Camera controls - positioned based on orientation
+                if currentOrientation.isLandscape {
+                    // Landscape: right-aligned layout without rotation
+                    HStack {
+                        Spacer()
+                        VStack {
+                            Spacer()
                             
-                            // Lens selector positioned at upper right of shutter button
-                            HStack(spacing: 4) {
-                                ForEach(cameraManager.availableLenses, id: \.rawValue) { lens in
+                            VStack(spacing: 20) {
+                                // Top row: lens control (right-aligned)
+                                HStack {
+                                    Spacer()
+                                    HStack(spacing: 4) {
+                                        ForEach(cameraManager.availableLenses, id: \.rawValue) { lens in
+                                            Button(action: {
+                                                cameraManager.switchToLens(lens)
+                                            }) {
+                                                Text(lens.displayLabel)
+                                                    .font(.system(size: 8, weight: .medium, design: .default))
+                                                    .foregroundColor(.white)
+                                                    .frame(width: 30, height: 30)
+                                                    .background(
+                                                        Circle()
+                                                            .fill(cameraManager.selectedLens == lens ? Color.black.opacity(0.8) : Color.gray.opacity(0.6))
+                                                    )
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Second row: vertical angle (left) and horizontal angle (right)
+                                HStack(spacing: 20) {
+                                    Spacer()
+                                    Text(formatVerticalAngle(cameraManager.currentTilt))
+                                        .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(Color.black.opacity(0.7))
+                                        .cornerRadius(8)
+                                    
+                                    Text(formatHorizontalAngle(cameraManager.currentRoll))
+                                        .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(Color.black.opacity(0.7))
+                                        .cornerRadius(8)
+                                }
+                                
+                                Spacer().frame(height: 20)
+                                
+                                // Third row: shutter button (right-aligned)
+                                HStack {
+                                    Spacer()
                                     Button(action: {
-                                        cameraManager.switchToLens(lens)
+                                        cameraManager.capturePhoto()
                                     }) {
-                                        Text(lens.displayLabel)
-                                            .font(.system(size: 8, weight: .medium, design: .default))
-                                            .foregroundColor(.white)
-                                            .frame(width: 30, height: 30)
-                                            .background(
+                                        Circle()
+                                            .fill(Color.white)
+                                            .frame(width: 70, height: 70)
+                                            .overlay(
                                                 Circle()
-                                                    .fill(cameraManager.selectedLens == lens ? Color.black.opacity(0.8) : Color.gray.opacity(0.6))
+                                                    .stroke(Color.black, lineWidth: 2)
+                                                    .frame(width: 60, height: 60)
                                             )
                                     }
                                 }
+                                
+                                Spacer().frame(height: 20)
+                                
+                                // Bottom row: heading (right-aligned)
+                                HStack {
+                                    Spacer()
+                                    Text(formatHeading(cameraManager.headingString))
+                                        .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(Color.black.opacity(0.7))
+                                        .cornerRadius(8)
+                                }
                             }
-                            .offset(x: 120, y: -25) // Position further to the right to avoid obscuring shutter
-                        }
-                        
-                        // Angle displays below shutter
-                        HStack(spacing: 20) {
-                            // Vertical angle (horizon-relative)
-                            Text(formatVerticalAngle(cameraManager.currentTilt))
-                                .font(.system(size: 18, weight: .medium, design: .monospaced))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(8)
                             
-                            // Heading
-                            Text(formatHeading(cameraManager.headingString))
-                                .font(.system(size: 18, weight: .medium, design: .monospaced))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(8)
-                            
-                            // Horizontal angle (horizon-relative roll)
-                            Text(formatHorizontalAngle(cameraManager.currentRoll))
-                                .font(.system(size: 18, weight: .medium, design: .monospaced))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(8)
+                            Spacer()
                         }
+                        .padding(.trailing, geometry.safeAreaInsets.bottom + 20)
                     }
-                    .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+                } else {
+                    // Portrait: controls at bottom
+                    VStack {
+                        Spacer()
+                        
+                        VStack(spacing: 16) {
+                            // Shutter button with lens selector at upper right
+                            ZStack {
+                                // Shutter button (centered)
+                                Button(action: {
+                                    cameraManager.capturePhoto()
+                                }) {
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 70, height: 70)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.black, lineWidth: 2)
+                                                .frame(width: 60, height: 60)
+                                        )
+                                }
+                                
+                                // Lens selector positioned at upper right of shutter button
+                                HStack(spacing: 4) {
+                                    ForEach(cameraManager.availableLenses, id: \.rawValue) { lens in
+                                        Button(action: {
+                                            cameraManager.switchToLens(lens)
+                                        }) {
+                                            Text(lens.displayLabel)
+                                                .font(.system(size: 8, weight: .medium, design: .default))
+                                                .foregroundColor(.white)
+                                                .frame(width: 30, height: 30)
+                                                .background(
+                                                    Circle()
+                                                        .fill(cameraManager.selectedLens == lens ? Color.black.opacity(0.8) : Color.gray.opacity(0.6))
+                                                )
+                                        }
+                                    }
+                                }
+                                .offset(x: 120, y: -25) // Position further to the right to avoid obscuring shutter
+                            }
+                            
+                            // Angle displays below shutter
+                            HStack(spacing: 20) {
+                                // Horizontal angle (horizon-relative roll)
+                                Text(formatHorizontalAngle(cameraManager.currentRoll))
+                                    .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(0.7))
+                                    .cornerRadius(8)
+                                
+                                // Heading
+                                Text(formatHeading(cameraManager.headingString))
+                                    .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(0.7))
+                                    .cornerRadius(8)
+                                
+                                // Vertical angle (horizon-relative)
+                                Text(formatVerticalAngle(cameraManager.currentTilt))
+                                    .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(0.7))
+                                    .cornerRadius(8)
+                            }
+                        }
+                        .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+                    }
                 }
             }
         }
@@ -165,7 +259,9 @@ struct CameraView: View {
         .onDisappear {
             cameraManager.stopCamera()
         }
-        .onRotate { orientation in
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            let orientation = UIDevice.current.orientation
+            currentOrientation = orientation
             cameraManager.updateOrientation(orientation)
         }
         .alert("Location Services Required", isPresented: $showingLocationPermissionAlert) {
@@ -234,16 +330,48 @@ struct CameraView: View {
     
     // Format vertical angle relative to horizon (0° = level)
     private func formatVerticalAngle(_ pitch: Double) -> String {
-        // Pitch is already in degrees, convert to horizon-relative (0° = level, + = up, - = down)
-        let horizonAngle = -pitch
-        return String(format: "%05.1f°", abs(horizonAngle))
+        // Pitch is already in degrees from motion update
+        // Convert to camera reference frame where 0° = horizon level
+        // Pointing down = positive, pointing up = negative
+        
+        // Normalize pitch to -180° to +180° range to handle full rotation
+        var normalizedPitch = pitch
+        while normalizedPitch > 180.0 {
+            normalizedPitch -= 360.0
+        }
+        while normalizedPitch < -180.0 {
+            normalizedPitch += 360.0
+        }
+        
+        // Convert to camera angle where 0° = horizon level
+        // When pitch is 90° (device upright, camera forward) = 0° camera angle
+        let cameraAngle = normalizedPitch - 90.0
+        
+        // Normalize camera angle to -90° to +90° range for display
+        var displayAngle = cameraAngle
+        if displayAngle > 90.0 {
+            displayAngle = 180.0 - displayAngle
+        } else if displayAngle < -90.0 {
+            displayAngle = -180.0 - displayAngle
+        }
+        
+        // Invert the sign so pointing down = positive, pointing up = negative
+        displayAngle = -displayAngle
+        
+        let sign = displayAngle >= 0 ? "+" : "-"
+        
+        // Debug logging
+        //print("formatVerticalAngle - pitch: \(pitch), normalizedPitch: \(normalizedPitch), cameraAngle: \(cameraAngle), displayAngle: \(displayAngle), sign: \(sign)")
+        
+        return String(format: "%@%04.1f°", sign, abs(displayAngle))
     }
     
     // Format horizontal angle relative to horizon (0° = level)
     private func formatHorizontalAngle(_ roll: Double) -> String {
-        // Roll is already in degrees, convert to horizon-relative (0° = level)
+        // Roll is already in degrees, 0° = level, negative = counterclockwise, positive = clockwise
         let horizonAngle = roll
-        return String(format: "%05.1f°", abs(horizonAngle))
+        let sign = horizonAngle >= 0 ? "+" : ""
+        return String(format: "%@%04.1f°", sign, horizonAngle)
     }
     
     // Format heading with zero padding and fixed-width compass direction
@@ -292,7 +420,7 @@ struct CameraPreviewView: UIViewRepresentable {
 }
 
 // MARK: - Camera Manager
-class CameraManager: NSObject, ObservableObject {
+class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCapturePhotoCaptureDelegate {
     let captureSession = AVCaptureSession()
     var previewLayer: AVCaptureVideoPreviewLayer?
     private var photoOutput = AVCapturePhotoOutput()
@@ -318,8 +446,7 @@ class CameraManager: NSObject, ObservableObject {
     private var currentHeading: CLHeading?
     private var currentOrientation: UIDeviceOrientation = .portrait
     
-    // Reverse geocoding
-    private let geocoder = CLGeocoder()
+    // Reverse geocoding - Updated for iOS 26.0
     @Published var currentAddress = "Getting address..."
     private var lastGeocodedLocation: CLLocation?
     
@@ -487,7 +614,17 @@ class CameraManager: NSObject, ObservableObject {
                 // Set to highest quality and full resolution
                 if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
                     // Use HEVC for better compression while maintaining quality
-                    photoOutput.isHighResolutionCaptureEnabled = true
+                    if #available(iOS 16.0, *) {
+                        // Get the maximum supported photo dimensions from the device's active format
+                        if let activeFormat = camera.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                            $0.width * $0.height < $1.width * $1.height
+                        }) {
+                            photoOutput.maxPhotoDimensions = activeFormat
+                            print("Set maxPhotoDimensions to: \(activeFormat.width)x\(activeFormat.height)")
+                        }
+                    } else {
+                        photoOutput.isHighResolutionCaptureEnabled = true
+                    }
                 }
             }
             
@@ -543,12 +680,85 @@ class CameraManager: NSObject, ObservableObject {
             return
         }
         
-        // Cancel any ongoing geocoding requests
-        geocoder.cancelGeocode()
-        
         print("Starting reverse geocoding for: \(location.coordinate.latitude), \(location.coordinate.longitude)")
         
-        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
+        // Use MapKit for iOS 26.0+, fallback to CLGeocoder for older versions
+        if #available(iOS 26.0, *) {
+            // Use MapKit for iOS 26.0+ (CLGeocoder is deprecated)
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = "\(location.coordinate.latitude),\(location.coordinate.longitude)"
+            request.region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000)
+            
+            let search = MKLocalSearch(request: request)
+            search.start { [weak self] response, error in
+                if let error = error {
+                    print("MapKit geocoding error: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self?.currentAddress = "Address lookup failed"
+                    }
+                    return
+                }
+                
+                guard let mapItem = response?.mapItems.first else {
+                    print("No address found with MapKit")
+                    DispatchQueue.main.async {
+                        self?.currentAddress = "No address found"
+                    }
+                    return
+                }
+                
+                // Enhanced address formatting with landmark detection and city/state
+                let placemark = mapItem.placemark
+                var addressComponents: [String] = []
+                var hasLandmark = false
+                
+                // Check if mapItem name contains recognizable landmarks
+                if let name = mapItem.name, !name.isEmpty {
+                    let lowercaseName = name.lowercased()
+                    let landmarks = ["grand canyon", "yellowstone", "yosemite", "mount", "lake", "beach", "park", "monument", "national", "state park", "bridge", "tower", "museum", "cathedral", "church", "stadium", "airport", "university", "college", "hospital", "plaza", "square", "center", "garden", "zoo", "aquarium", "observatory", "lighthouse", "falls", "river", "valley", "forest", "desert", "glacier", "volcano", "trail", "overlook", "viewpoint", "rim", "point", "peak", "summit"]
+                    
+                    // Check if name contains landmark keywords or is likely a point of interest
+                    hasLandmark = landmarks.contains { lowercaseName.contains($0) } ||
+                                 name.count > 20 || // Long descriptive names are often landmarks
+                                 !lowercaseName.contains("st ") && !lowercaseName.contains("ave ") && !lowercaseName.contains("rd ") // Not a street address
+                    
+                    if hasLandmark {
+                        addressComponents.append(name)
+                    }
+                }
+                
+                // Add street address if no landmark or if landmark doesn't seem complete
+                if !hasLandmark {
+                    if let subThoroughfare = placemark.subThoroughfare,
+                       let thoroughfare = placemark.thoroughfare {
+                        addressComponents.append("\(subThoroughfare) \(thoroughfare)")
+                    } else if let thoroughfare = placemark.thoroughfare {
+                        addressComponents.append(thoroughfare)
+                    }
+                }
+                
+                // Always add city and state when available for context
+                if let locality = placemark.locality,
+                   let administrativeArea = placemark.administrativeArea {
+                    addressComponents.append("\(locality), \(administrativeArea)")
+                } else if let locality = placemark.locality {
+                    addressComponents.append(locality)
+                } else if let administrativeArea = placemark.administrativeArea {
+                    addressComponents.append(administrativeArea)
+                }
+                
+                let formattedAddress = addressComponents.joined(separator: " | ")
+                
+                print("Successfully geocoded address with MapKit: \(formattedAddress)")
+                DispatchQueue.main.async {
+                    self?.currentAddress = formattedAddress.isEmpty ? "Address unavailable" : formattedAddress
+                    self?.lastGeocodedLocation = location
+                }
+            }
+        } else {
+            // Use CLGeocoder for iOS versions before 26.0
+            let geocoder = CLGeocoder()
+            geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             if let error = error {
                 print("Reverse geocoding error: \(error.localizedDescription)")
                 DispatchQueue.main.async {
@@ -565,18 +775,50 @@ class CameraManager: NSObject, ObservableObject {
                 return
             }
             
-            // Format address similar to Google Maps format
+            // Enhanced address formatting with landmark detection and city/state
             var addressComponents: [String] = []
+            var hasLandmark = false
             
-            // Add street number and name
-            if let subThoroughfare = placemark.subThoroughfare,
-               let thoroughfare = placemark.thoroughfare {
-                addressComponents.append("\(subThoroughfare) \(thoroughfare)")
-            } else if let thoroughfare = placemark.thoroughfare {
-                addressComponents.append(thoroughfare)
+            // Check for recognizable landmarks in placemark name or areas of interest
+            if let name = placemark.name, !name.isEmpty {
+                let lowercaseName = name.lowercased()
+                let landmarks = ["grand canyon", "yellowstone", "yosemite", "mount", "lake", "beach", "park", "monument", "national", "state park", "bridge", "tower", "museum", "cathedral", "church", "stadium", "airport", "university", "college", "hospital", "plaza", "square", "center", "garden", "zoo", "aquarium", "observatory", "lighthouse", "falls", "river", "valley", "forest", "desert", "glacier", "volcano", "trail", "overlook", "viewpoint", "rim", "point", "peak", "summit"]
+                
+                // Check if name contains landmark keywords or is likely a point of interest
+                hasLandmark = landmarks.contains { lowercaseName.contains($0) } ||
+                             name.count > 20 || // Long descriptive names are often landmarks
+                             !lowercaseName.contains("st ") && !lowercaseName.contains("ave ") && !lowercaseName.contains("rd ") // Not a street address
+                
+                if hasLandmark {
+                    addressComponents.append(name)
+                }
             }
             
-            // Add city and state
+            // Also check areasOfInterest for landmarks
+            if !hasLandmark, let areasOfInterest = placemark.areasOfInterest, !areasOfInterest.isEmpty {
+                for area in areasOfInterest {
+                    let lowercaseArea = area.lowercased()
+                    let landmarks = ["grand canyon", "yellowstone", "yosemite", "mount", "lake", "beach", "park", "monument", "national", "state park", "bridge", "tower", "museum", "cathedral", "church", "stadium", "airport", "university", "college", "hospital", "plaza", "square", "center", "garden", "zoo", "aquarium", "observatory", "lighthouse", "falls", "river", "valley", "forest", "desert", "glacier", "volcano", "trail", "overlook", "viewpoint", "rim", "point", "peak", "summit"]
+                    
+                    if landmarks.contains(where: { lowercaseArea.contains($0) }) {
+                        addressComponents.append(area)
+                        hasLandmark = true
+                        break
+                    }
+                }
+            }
+            
+            // Add street address if no landmark found
+            if !hasLandmark {
+                if let subThoroughfare = placemark.subThoroughfare,
+                   let thoroughfare = placemark.thoroughfare {
+                    addressComponents.append("\(subThoroughfare) \(thoroughfare)")
+                } else if let thoroughfare = placemark.thoroughfare {
+                    addressComponents.append(thoroughfare)
+                }
+            }
+            
+            // Always add city and state when available for context
             if let locality = placemark.locality,
                let administrativeArea = placemark.administrativeArea {
                 addressComponents.append("\(locality), \(administrativeArea)")
@@ -593,6 +835,7 @@ class CameraManager: NSObject, ObservableObject {
                 self?.currentAddress = formattedAddress.isEmpty ? "Address unavailable" : formattedAddress
                 self?.lastGeocodedLocation = location
             }
+            }
         }
     }
     
@@ -603,13 +846,29 @@ class CameraManager: NSObject, ObservableObject {
         
         switch orientation {
         case .portrait:
-            connection.videoOrientation = .portrait
+            if #available(iOS 17.0, *) {
+                connection.videoRotationAngle = 0
+            } else {
+                connection.videoOrientation = .portrait
+            }
         case .landscapeLeft:
-            connection.videoOrientation = .landscapeRight
+            if #available(iOS 17.0, *) {
+                connection.videoRotationAngle = 90
+            } else {
+                connection.videoOrientation = .landscapeRight
+            }
         case .landscapeRight:
-            connection.videoOrientation = .landscapeLeft
+            if #available(iOS 17.0, *) {
+                connection.videoRotationAngle = 270
+            } else {
+                connection.videoOrientation = .landscapeLeft
+            }
         case .portraitUpsideDown:
-            connection.videoOrientation = .portraitUpsideDown
+            if #available(iOS 17.0, *) {
+                connection.videoRotationAngle = 180
+            } else {
+                connection.videoOrientation = .portraitUpsideDown
+            }
         default:
             break
         }
@@ -619,7 +878,7 @@ class CameraManager: NSObject, ObservableObject {
 }
 
 // MARK: - Location Manager Delegate
-extension CameraManager: CLLocationManagerDelegate {
+extension CameraManager {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         DispatchQueue.main.async {
             self.locationAuthorizationStatus = manager.authorizationStatus
@@ -752,7 +1011,7 @@ extension CameraManager: CLLocationManagerDelegate {
 }
 
 // MARK: - Photo Capture Delegate
-extension CameraManager: AVCapturePhotoCaptureDelegate {
+extension CameraManager {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         if let error = error {
             print("Error capturing photo: \(error)")
@@ -823,136 +1082,108 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
         }
     }
     
+    // MARK: - Missing Helper Functions
+    
+    private func addEXIFMetadata(to imageData: Data) -> Data {
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
+              let metadata = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
+            return imageData
+        }
+        
+        let mutableData = NSMutableData(data: imageData)
+        guard let destination = CGImageDestinationCreateWithData(mutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
+            return imageData
+        }
+        
+        var mutableMetadata = metadata
+        
+        // Add GPS metadata if location is available
+        if let location = currentLocation {
+            mutableMetadata[kCGImagePropertyGPSDictionary as String] = createGPSMetadata(from: location)
+        }
+        
+        // Add timestamp
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        let timestamp = dateFormatter.string(from: Date())
+        
+        var exifDict = mutableMetadata[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
+        exifDict[kCGImagePropertyExifDateTimeOriginal as String] = timestamp
+        exifDict[kCGImagePropertyExifDateTimeDigitized as String] = timestamp
+        mutableMetadata[kCGImagePropertyExifDictionary as String] = exifDict
+        
+        CGImageDestinationAddImageFromSource(destination, source, 0, mutableMetadata as CFDictionary)
+        CGImageDestinationFinalize(destination)
+        
+        return mutableData as Data
+    }
+    
+    private func createGPSMetadata(from location: CLLocation) -> [String: Any] {
+        let coordinate = location.coordinate
+        let altitude = location.altitude
+        let timestamp = location.timestamp
+        
+        var gpsMetadata: [String: Any] = [:]
+        
+        // Latitude
+        gpsMetadata[kCGImagePropertyGPSLatitude as String] = abs(coordinate.latitude)
+        gpsMetadata[kCGImagePropertyGPSLatitudeRef as String] = coordinate.latitude >= 0 ? "N" : "S"
+        
+        // Longitude
+        gpsMetadata[kCGImagePropertyGPSLongitude as String] = abs(coordinate.longitude)
+        gpsMetadata[kCGImagePropertyGPSLongitudeRef as String] = coordinate.longitude >= 0 ? "E" : "W"
+        
+        // Altitude
+        gpsMetadata[kCGImagePropertyGPSAltitude as String] = abs(altitude)
+        gpsMetadata[kCGImagePropertyGPSAltitudeRef as String] = altitude >= 0 ? 0 : 1
+        
+        // Timestamp
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
+        gpsMetadata[kCGImagePropertyGPSTimeStamp as String] = dateFormatter.string(from: timestamp)
+        
+        let dateOnlyFormatter = DateFormatter()
+        dateOnlyFormatter.dateFormat = "yyyy:MM:dd"
+        dateOnlyFormatter.timeZone = TimeZone(identifier: "UTC")
+        gpsMetadata[kCGImagePropertyGPSDateStamp as String] = dateOnlyFormatter.string(from: timestamp)
+        
+        return gpsMetadata
+    }
+    
     private func applyProperOrientation(to image: UIImage) -> UIImage {
-        // Camera captures based on device orientation - apply correct rotation for each case
         switch currentOrientation {
-        case .portrait:
-            // Portrait: rotate 90° clockwise (right) to correct orientation
+        case .landscapeLeft:
+            return rotateImage(image, by: .left)
+        case .landscapeRight:
             return rotateImage(image, by: .right)
         case .portraitUpsideDown:
-            // Portrait upside down: rotate 90° counter-clockwise (left) to correct orientation
-            return rotateImage(image, by: .left)
-        case .landscapeLeft:
-            // Landscape left: no rotation needed - camera is already aligned correctly
-            return image
-        case .landscapeRight:
-            // Landscape right: rotate 180° to correct the upside down issue
             return rotateImage(image, by: .down)
         default:
-            // Default to portrait orientation
-            return rotateImage(image, by: .right)
+            return image
         }
     }
     
-    private func rotateImage(_ image: UIImage, by orientation: UIImage.Orientation) -> UIImage {
+    private func rotateImage(_ image: UIImage, by direction: UIImage.Orientation) -> UIImage {
         guard let cgImage = image.cgImage else { return image }
+        
+        let orientation: UIImage.Orientation
+        switch direction {
+        case .left:
+            orientation = .left
+        case .right:
+            orientation = .right
+        case .down:
+            orientation = .down
+        default:
+            orientation = .up
+        }
         
         return UIImage(cgImage: cgImage, scale: image.scale, orientation: orientation)
     }
     
-    private func addEXIFMetadata(to imageData: Data) -> Data {
-        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
-              let type = CGImageSourceGetType(source) else {
-            print("Error: Could not create image source")
-            return imageData
-        }
-        
-        // Create mutable data for the new image
-        let mutableData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(mutableData, type, 1, nil) else {
-            print("Error: Could not create image destination")
-            return imageData
-        }
-        
-        // Get existing metadata
-        var metadata: [String: Any] = [:]
-        if let existingMetadata = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] {
-            metadata = existingMetadata
-        }
-        
-        print("Original metadata keys: \(metadata.keys)")
-        
-        // Add GPS metadata if location is available
-        if let location = currentLocation {
-            let gpsDict = createGPSMetadata(location: location, heading: currentHeading)
-            metadata[kCGImagePropertyGPSDictionary as String] = gpsDict
-            
-            let latitude = location.coordinate.latitude
-            let longitude = location.coordinate.longitude
-            print("Added GPS metadata: lat=\(latitude), lon=\(longitude), alt=\(location.altitude)")
-            print("GPS dictionary contents: \(gpsDict)")
-        } else {
-            print("Warning: No location data available for GPS metadata")
-        }
-        
-        // EXIF orientation metadata feature disabled
-        // The orientation metadata is not being set to allow photo viewers to handle orientation naturally
-        print("EXIF orientation metadata disabled - letting photo viewers handle orientation naturally")
-        
-        // Add EXIF metadata
-        var exifDict: [String: Any] = metadata[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
-        
-        // Add comprehensive user comment with all sensor data
-        var userComment = "PhotoAssistant"
-        if let location = currentLocation {
-            userComment += String(format: " GPS:%.6f,%.6f", location.coordinate.latitude, location.coordinate.longitude)
-            if location.verticalAccuracy >= 0 {
-                userComment += String(format: " Alt:%.1fm", location.altitude)
-            }
-        }
-        if let heading = currentHeading {
-            let trueHeading = heading.trueHeading >= 0 ? heading.trueHeading : heading.magneticHeading
-            userComment += String(format: " Heading:%.1f°", trueHeading)
-        }
-        userComment += String(format: " Tilt:%.1f°", currentTilt)
-        
-        exifDict[kCGImagePropertyExifUserComment as String] = userComment
-        
-        // Add creation date
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        let currentDate = Date()
-        exifDict[kCGImagePropertyExifDateTimeOriginal as String] = dateFormatter.string(from: currentDate)
-        exifDict[kCGImagePropertyExifDateTimeDigitized as String] = dateFormatter.string(from: currentDate)
-        
-        metadata[kCGImagePropertyExifDictionary as String] = exifDict
-        
-        // Add TIFF metadata
-        var tiffDict: [String: Any] = metadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] ?? [:]
-        tiffDict[kCGImagePropertyTIFFSoftware as String] = "PhotoAssistant v1.0"
-        tiffDict[kCGImagePropertyTIFFDateTime as String] = dateFormatter.string(from: currentDate)
-        metadata[kCGImagePropertyTIFFDictionary as String] = tiffDict
-        
-        print("Final metadata keys before writing: \(metadata.keys)")
-        print("GPS dictionary exists: \(metadata[kCGImagePropertyGPSDictionary as String] != nil)")
-        
-        // Copy image with new metadata
-        CGImageDestinationAddImageFromSource(destination, source, 0, metadata as CFDictionary)
-        
-        if CGImageDestinationFinalize(destination) {
-            print("Successfully added EXIF metadata to image")
-            
-            // Verify the metadata was actually written
-            if let verifySource = CGImageSourceCreateWithData(mutableData, nil),
-               let verifyMetadata = CGImageSourceCopyPropertiesAtIndex(verifySource, 0, nil) as? [String: Any] {
-                print("Verification - Final image metadata keys: \(verifyMetadata.keys)")
-                if let gpsData = verifyMetadata[kCGImagePropertyGPSDictionary as String] {
-                    print("Verification - GPS metadata successfully embedded: \(gpsData)")
-                } else {
-                    print("Warning - GPS metadata not found in final image!")
-                }
-            }
-            
-            return mutableData as Data
-        } else {
-            print("Error: Failed to finalize image with metadata")
-            return imageData
-        }
-    }
-    
     private func addLocationBanner(to image: UIImage) -> UIImage {
         let bannerHeight: CGFloat = 120  // Height for two lines of text
-        let padding: CGFloat = 16
         let fontSize: CGFloat = 32       // Optimal size for readability
         let lineSpacing: CGFloat = 8     // Space between lines
         
