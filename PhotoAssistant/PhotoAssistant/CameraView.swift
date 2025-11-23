@@ -2,1122 +2,1859 @@
 //  CameraView.swift
 //  PhotoAssistant
 //
-//  Created by Richard Cox on 10/13/25.
+//  Created by Richard Cox on 10/18/25.
 //
+//  Updated for maximum stability using persistent AVCaptureVideoPreviewLayer pattern
+//  FIXED: Main Thread Checker error by wrapping all UI layer access in DispatchQueue.main.async
 
-import SwiftUI
-import AVFoundation
-import CoreLocation
-import CoreMotion
-import Photos
-import UIKit
 import Combine
+import AVFoundation
+import SwiftUI
+import CoreLocation
 import ImageIO
+import UniformTypeIdentifiers
+import SwiftData
 
-// MARK: - Camera Lens Types
-enum CameraLens: String, CaseIterable {
-    case ultraWide = "0.5x"
-    case wide = "1x"
-    case telephoto = "2x"
-    case telephoto3x = "3x"
-    
-    var displayLabel: String {
-        switch self {
-        case .ultraWide: return ".5"
-        case .wide: return "1x"
-        case .telephoto: return "2"
-        case .telephoto3x: return "3"
-        }
-    }
-    
-    var deviceType: AVCaptureDevice.DeviceType {
-        switch self {
-        case .ultraWide: return .builtInUltraWideCamera
-        case .wide: return .builtInWideAngleCamera
-        case .telephoto: return .builtInTelephotoCamera
-        case .telephoto3x: return .builtInTelephotoCamera
-        }
-    }
+// MARK: - REMOVED: struct FilmFormat { ... }
+// MARK: - REMOVED: struct ZoomLens { ... }
+// Assuming ZoomRange, Lens, and MyGearModel are available from MyGearModel.swift
+
+enum CornerPosition {
+    case topLeading, topTrailing, bottomLeading, bottomTrailing
 }
 
+// MARK: - SwiftUI View
+
 struct CameraView: View {
-    @StateObject private var cameraManager = CameraManager()
-    @State private var showingLocationPermissionAlert = false
-    @State private var showingInitialLocationRequest = false
-    @State private var cameraStarted = false
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var camera = CameraManager()
+    @State private var showCropMarks = false
+    @State private var selectedFocalLength = 80
+    @State private var showCropMarksControlPanel = false
+
+    // NEW STATE: For managing loaded gear and the selected camera
+    @State private var gearList: [MyGearModel] = MyGearModel.loadGearList()
+    @State private var selectedGear: MyGearModel?
     
+    // NEW: Computed property for the currently selected gear's data
+    private var currentGearData: MyGearModel {
+        // Fallback logic for when selectedGear is nil (e.g., initial load or empty list)
+        if let gear = selectedGear {
+            return gear
+        }
+        
+        // Define a default/fallback camera if MyGearModel.loadGearList() returns empty or selectedGear is nil
+        return MyGearModel(
+            cameraName: "Hasselblad 500c (Default)",
+            capturePlane: "6x6 cm (Default)",
+            capturePlaneWidth: 60,
+            capturePlaneHeight: 60,
+            capturePlaneDiagonal: 84.85,
+            lenses: [
+                Lens(name: "80mm", type: .prime, primeFocalLength: 80)
+            ]
+        )
+    }
+
+    // Lenses array for isZoomLens check (must be accessible from here)
+    // MODIFIED: Use the lenses from the selected gear
+    private var availableZoomLensesForCheck: [Lens] {
+        currentGearData.lenses.filter { $0.type == .zoom && $0.zoomRange != nil }
+    }
+
+
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Fallback background to ensure something is visible
-                Color.red.opacity(0.3)
-                    .ignoresSafeArea()
+        ZStack {
+            if camera.hasPermission && camera.isCameraReady {
                 
-                // Camera preview with dynamic sizing based on orientation
-                CameraPreviewView(cameraManager: cameraManager, size: geometry.size)
+                // Use the new CameraPreviewView which wraps the persistent layer
+                CameraPreviewView(container: camera.getPreviewViewContainer(), showCropMarks: showCropMarks)
                     .ignoresSafeArea()
+                    // MODIFIED: Only hides the control panel; leaves the crop marks visible if a lens is selected.
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showCropMarksControlPanel = false
+                        }
+                    }
                 
+                // Calculate the effective focal length, correctly unwrapping the Binding
+                let effectiveFocalLength = Int(round(camera.physicalFocalLength * camera.baseZoomFactor))
+                
+                // Determine if the selected focal length is within a zoom range for visualization
+                let isZoomLensActive: Bool = availableZoomLensesForCheck.first(where: {
+                    selectedFocalLength >= $0.zoomRange?.min ?? Int.min && selectedFocalLength <= $0.zoomRange?.max ?? Int.max
+                }) != nil
+
+                // Crop marks overlay
+                CropMarksOverlay(
+                    // MODIFIED: Pass dimensions instead of filmFormat struct
+                    capturePlaneWidth: currentGearData.capturePlaneWidth,
+                    capturePlaneHeight: currentGearData.capturePlaneHeight,
+                    capturePlaneDiagonal: currentGearData.capturePlaneDiagonal,
+                    selectedFocalLength: selectedFocalLength,
+                    currentCameraFocalLength: effectiveFocalLength,
+                    isVisible: showCropMarks,
+                    isZoomLens: isZoomLensActive
+                )
+                .allowsHitTesting(false)
+
                 VStack {
+                    // Crop marks control panel at the top, visible only when toggled by the toolbar button.
+                    if showCropMarksControlPanel {
+                        HStack {
+                            Spacer()
+                            CropMarksControlPanel(
+                                // NEW: Pass the gear list and selection binding
+                                gearList: gearList,
+                                selectedGear: $selectedGear,
+                                selectedFocalLength: $selectedFocalLength,
+                                currentCameraFocalLength: effectiveFocalLength,
+                                showCropMarks: $showCropMarks
+                            )
+                            // MODIFIED: Increased padding to place it reliably below the navigation bar
+                            .padding(.top, 125)
+                            .padding(.trailing, 20)
+                        }
+                    }
+                    
                     Spacer()
                     
-                    VStack(spacing: 16) {
-                        // Shutter button with lens selector at upper right
-                        ZStack {
-                            // Shutter button (centered)
+                    // Camera name and current lens selection
+                    VStack(spacing: 4) {
+                        if showCropMarks {
+                            // MODIFIED: Replace "Hasselblad 500c" with the selected camera's name
+                            Text("\(currentGearData.cameraName) / \(selectedFocalLength)mm")
+                                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .padding(.bottom, 8)
+                    
+                    HStack(spacing: 15) {
+                        ForEach(camera.availableZoomLevels, id: \.self) { zoom in
                             Button(action: {
-                                cameraManager.capturePhoto()
+                                // Correct call syntax for the @StateObject's object
+                                camera.switchInternalCamera(zoom)
                             }) {
+                                Text(zoom < 1 ? ".5x" : "\(Int(zoom))x")
+                                    .font(.system(size: 16, weight: camera.getClosestZoomLevel() == zoom ? .bold : .regular))
+                                    .foregroundColor(camera.getClosestZoomLevel() == zoom ? .yellow : .white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(camera.getClosestZoomLevel() == zoom ? Color.white.opacity(0.3) : Color.clear)
+                                    .cornerRadius(15)
+                            }
+                            .disabled(camera.isCapturing)
+                        }
+                    }
+                    .padding(.bottom, 12)
+
+                    // ----------------------------------------------------------------------------------
+                    // MODIFICATION: Centering Shutter and Positioning Switch Button
+                    // ----------------------------------------------------------------------------------
+                    HStack(spacing: 0) {
+                        Spacer() // Pushes controls to the center
+
+                        // 1. Switch Camera Button (just to the left of the Shutter)
+                        Button(action: {
+                            camera.switchCamera()
+                        }) {
+                            Image(systemName: "arrow.triangle.2.circlepath.camera")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white)
+                                .frame(width: 50, height: 50)
+                        }
+                        .padding(.trailing, 25) // Reduced padding for closer placement
+                        .disabled(camera.isCapturing)
+
+                        // 2. Capture Photo Button (Shutter - Centered)
+                        Button(action: {
+                            camera.capturePhoto()
+                        }) {
+                            ZStack {
                                 Circle()
-                                    .fill(Color.white)
+                                    .fill(Color.white.opacity(camera.isCapturing ? 0.5 : 1.0))
                                     .frame(width: 70, height: 70)
                                     .overlay(
                                         Circle()
-                                            .stroke(Color.black, lineWidth: 2)
-                                            .frame(width: 60, height: 60)
+                                            .stroke(Color.white, lineWidth: 3)
+                                            .frame(width: 80, height: 80)
                                     )
-                            }
-                            
-                            // Lens selector positioned at upper right of shutter button
-                            HStack(spacing: 4) {
-                                ForEach(cameraManager.availableLenses, id: \.rawValue) { lens in
-                                    Button(action: {
-                                        cameraManager.switchToLens(lens)
-                                    }) {
-                                        Text(lens.displayLabel)
-                                            .font(.system(size: 8, weight: .medium, design: .default))
-                                            .foregroundColor(.white)
-                                            .frame(width: 30, height: 30)
-                                            .background(
-                                                Circle()
-                                                    .fill(cameraManager.selectedLens == lens ? Color.black.opacity(0.8) : Color.gray.opacity(0.6))
-                                            )
-                                    }
+                                if camera.isCapturing {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                        .scaleEffect(1.2)
                                 }
                             }
-                            .offset(x: 120, y: -25) // Position further to the right to avoid obscuring shutter
                         }
+                        .disabled(camera.isCapturing)
                         
-                        // Angle displays below shutter
-                        HStack(spacing: 20) {
-                            // Vertical angle (horizon-relative)
-                            Text(formatVerticalAngle(cameraManager.currentTilt))
-                                .font(.system(size: 18, weight: .medium, design: .monospaced))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(8)
-                            
-                            // Heading
-                            Text(formatHeading(cameraManager.headingString))
-                                .font(.system(size: 18, weight: .medium, design: .monospaced))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(8)
-                            
-                            // Horizontal angle (horizon-relative roll)
-                            Text(formatHorizontalAngle(cameraManager.currentRoll))
-                                .font(.system(size: 18, weight: .medium, design: .monospaced))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(8)
-                        }
+                        // 3. Placeholder (Invisible View) to balance the width of the Switch button and its padding (50+25=75)
+                        Color.clear.frame(width: 50 + 25, height: 1)
+                        
+                        Spacer()
                     }
-                    .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+                    .padding(.bottom, 50)
+                }
+            } else {
+                Color.black.ignoresSafeArea()
+                VStack(spacing: 20) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.white)
+
+                    if !camera.hasPermission {
+                        Text("Camera Access Required")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                        Text("Please allow camera access in Settings to use this feature")
+                            .font(.body)
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                        Button("Open Settings") {
+                            if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(settingsUrl)
+                            }
+                        }
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                        .padding(.top, 10)
+
+                    } else if camera.isSimulator {
+                        Text("Camera Not Available")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                        Text("Camera functionality is not available in the iOS Simulator. Please test on a physical device.")
+                            .font(.body)
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+
+                    } else if camera.isCameraLocked {
+                        Text("Camera Temporarily Unavailable")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                        Text("The camera may be in use by another application. Please close the other application or exit its camera view, then return to GeoLog.")
+                            .font(.body)
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+
+                    } else {
+                        Text("Setting Up Camera...")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .padding(.top, 10)
+                    }
+                }
+            }
+        }
+        // MODIFIED: Toolbar button only toggles the control panel visibility.
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showCropMarksControlPanel.toggle()
+                        
+                        // REMOVED: Logic to turn off crop marks when panel closes.
+                        // Now, crop marks only hide when the user taps the active lens button inside the panel.
+                    }
+                }) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 20))
+                        .foregroundColor(.black)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white.opacity(1.0))
+                        .clipShape(Circle())
                 }
             }
         }
         .onAppear {
-            print("CameraView appeared")
-            requestLocationPermissionIfNeeded()
+            camera.setModelContext(modelContext)
+            
+            // NEW: Set the initial selected gear if it exists
+            if selectedGear == nil, let firstGear = gearList.first {
+                selectedGear = firstGear
+                // Also set the initial focal length from the first available prime lens, or 80mm default
+                selectedFocalLength = firstGear.lenses.first(where: { $0.type == .prime })?.primeFocalLength ?? 80
+            }
+
+            if camera.hasPermission {
+                if !camera.isSimulator {
+                    camera.reloadCamera()
+                }
+            } else {
+                camera.checkInitialPermissions()
+            }
         }
         .onDisappear {
-            cameraManager.stopCamera()
+            camera.pauseSession()
         }
-        .onRotate { orientation in
-            cameraManager.updateOrientation(orientation)
-        }
-        .alert("Location Services Required", isPresented: $showingLocationPermissionAlert) {
-            Button("Open Settings") {
-                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(settingsUrl)
-                }
-            }
-            Button("Continue Without Location", role: .destructive) {
-                startCameraIfNotStarted()
-            }
-        } message: {
-            Text("PhotoAssistant needs location access to add GPS coordinates, addresses, and heading information to your photos. Please enable location services in Settings > Privacy & Security > Location Services > PhotoAssistant.")
-        }
-        .alert("Enable Location Services", isPresented: $showingInitialLocationRequest) {
-            Button("Allow Location") {
-                cameraManager.requestLocationPermission()
-                startCameraIfNotStarted()
-            }
-            Button("Skip") {
-                startCameraIfNotStarted()
-            }
-        } message: {
-            Text("PhotoAssistant can add GPS coordinates, address, altitude, and compass heading to your photos. This helps with organizing and geotagging your images. Location data is only used for photo metadata and is not shared.")
-        }
-        .onChange(of: cameraManager.locationAuthorizationStatus) { _, newStatus in
-            // React to location permission changes
-            if newStatus == .denied || newStatus == .restricted {
-                showingLocationPermissionAlert = true
-            }
-        }
-    }
-    
-    private func requestLocationPermissionIfNeeded() {
-        let locationStatus = cameraManager.locationAuthorizationStatus
-        print("Current location status on startup: \(locationStatus.rawValue)")
-        
-        switch locationStatus {
-        case .notDetermined:
-            // Show explanation and request permission
-            print("Location permission not determined, showing explanation alert")
-            showingInitialLocationRequest = true
-        case .denied, .restricted:
-            // Permission was previously denied, show settings alert
-            print("Location access denied/restricted, showing settings alert")
-            showingLocationPermissionAlert = true
-            // Start camera anyway for users who want to use without location
-            startCameraIfNotStarted()
-        case .authorizedWhenInUse, .authorizedAlways:
-            // Permission already granted, start everything normally
-            print("Location permission already granted, starting camera")
-            startCameraIfNotStarted()
-        @unknown default:
-            // Unknown status, treat as not determined
-            print("Unknown location permission status, showing explanation")
-            showingInitialLocationRequest = true
-        }
-    }
-    
-    private func startCameraIfNotStarted() {
-        guard !cameraStarted else { return }
-        cameraStarted = true
-        cameraManager.requestCameraPermissions()
-        cameraManager.startCamera()
-    }
-    
-    // Format vertical angle relative to horizon (0° = level)
-    private func formatVerticalAngle(_ pitch: Double) -> String {
-        // Pitch is already in degrees, convert to horizon-relative (0° = level, + = up, - = down)
-        let horizonAngle = -pitch
-        return String(format: "%05.1f°", abs(horizonAngle))
-    }
-    
-    // Format horizontal angle relative to horizon (0° = level)
-    private func formatHorizontalAngle(_ roll: Double) -> String {
-        // Roll is already in degrees, convert to horizon-relative (0° = level)
-        let horizonAngle = roll
-        return String(format: "%05.1f°", abs(horizonAngle))
-    }
-    
-    // Format heading with zero padding and fixed-width compass direction
-    private func formatHeading(_ headingString: String) -> String {
-        // Extract numeric heading from string like "31° NNW"
-        let components = headingString.components(separatedBy: "°")
-        if let headingStr = components.first,
-           let heading = Double(headingStr) {
-            let direction = components.count > 1 ? components[1].trimmingCharacters(in: .whitespaces) : "N"
-            // Pad direction to 3 characters to prevent jiggling using Swift's native padding
-            let paddedDirection = direction.padding(toLength: 3, withPad: " ", startingAt: 0)
-            return String(format: "%03.0f° %@", heading, paddedDirection)
-        }
-        return "000° N  "
-    }
-}
-
-// MARK: - Camera Preview View
-struct CameraPreviewView: UIViewRepresentable {
-    let cameraManager: CameraManager
-    let size: CGSize
-    
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        view.backgroundColor = .black
-        
-        // Create preview layer to show 100% of camera output
-        let previewLayer = AVCaptureVideoPreviewLayer(session: cameraManager.captureSession)
-        // Use resizeAspectFill to show the complete camera field of view
-        // This ensures you see 100% of what the camera captures
-        previewLayer.videoGravity = .resizeAspectFill
-        
-        view.layer.addSublayer(previewLayer)
-        cameraManager.previewLayer = previewLayer
-        
-        return view
-    }
-    
-    func updateUIView(_ uiView: UIView, context: Context) {
-        DispatchQueue.main.async {
-            if let previewLayer = cameraManager.previewLayer {
-                previewLayer.frame = uiView.bounds
+        .onReceive(camera.objectWillChange) {
+            if camera.isCameraReady && camera.hasPermission && !camera.isSimulator {
+                // Trigger view redraw when manager state changes
             }
         }
     }
 }
 
-// MARK: - Camera Manager
-class CameraManager: NSObject, ObservableObject {
-    let captureSession = AVCaptureSession()
-    var previewLayer: AVCaptureVideoPreviewLayer?
+// MARK: - AVCaptureSession Management (CameraManager)
+// ... (CameraManager remains the same)
+
+class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCapturePhotoCaptureDelegate {
+    @Published var isCameraReady = false
+    @Published var hasPermission = false
+    @Published var isCameraLocked = false
+    @Published var currentPosition: AVCaptureDevice.Position = .back
+    @Published var currentZoom: CGFloat = 1.0
+    @Published var availableZoomLevels: [CGFloat] = []
+    @Published var isCapturing = false
+    @Published var errorMessage = ""
+    
+    // ----------------------------------------------------------------------------------
+    // MODIFICATION: Renamed back to physicalFocalLength as it now holds the actual mm value.
+    // ----------------------------------------------------------------------------------
+    @Published var physicalFocalLength: CGFloat = 0.0
+    
+    var isSimulator: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return false
+        #endif
+    }
+    
+    private let sessionQueue = DispatchQueue(label: "com.photoAssistant.camerasession")
+    
+    let session = AVCaptureSession()
     private var photoOutput = AVCapturePhotoOutput()
-    
-    // Location and motion managers
-    private let locationManager = CLLocationManager()
-    private let motionManager = CMMotionManager()
-    
-    // Published properties for UI updates
-    @Published var locationString = "Getting location..."
-    @Published var headingString = "Getting heading..."
-    @Published var altitudeString = "Getting altitude..."
-    @Published var tiltString = "Getting tilt..."
-    @Published var cameraStatus = "Initializing..."
-    @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
-    @Published var currentTilt: Double = 0.0
-    @Published var currentRoll: Double = 0.0
-    @Published var availableLenses: [CameraLens] = []
-    @Published var selectedLens: CameraLens = .wide
-    
-    // Current sensor data
+    private var currentInput: AVCaptureDeviceInput?
+    private var currentDevice: AVCaptureDevice?
+    public var baseZoomFactor: CGFloat = 1.0
+    private var locationManager: CLLocationManager?
     private var currentLocation: CLLocation?
     private var currentHeading: CLHeading?
-    private var currentOrientation: UIDeviceOrientation = .portrait
+    private var modelContext: ModelContext?
+    private var geocodeManager = GeocodeManager()
+    private var deviceOrientation: UIDeviceOrientation = .portrait
     
-    // Reverse geocoding
-    private let geocoder = CLGeocoder()
-    @Published var currentAddress = "Getting address..."
-    private var lastGeocodedLocation: CLLocation?
+    private var restartAttemptCount: Int = 0
+    private let maxRestartAttempts: Int = 40
+    
+    private let previewLayerContainer = PreviewViewContainer()
     
     override init() {
         super.init()
-        locationAuthorizationStatus = CLLocationManager().authorizationStatus
         setupLocationManager()
-        setupMotionManager()
+        setupOrientationMonitoring()
+        setupSessionObservers()
+        setupAppLifecycleObservers()
     }
     
-    func requestCameraPermissions() {
-        AVCaptureDevice.requestAccess(for: .video) { granted in
-            DispatchQueue.main.async {
-                if granted {
-                    print("Camera permission granted")
-                } else {
-                    print("Camera permission denied")
-                }
-            }
+    func getPreviewViewContainer() -> UIView {
+        return previewLayerContainer
+    }
+    
+    func setModelContext(_ context: ModelContext) {
+        self.modelContext = context
+    }
+    
+    private func setupOrientationMonitoring() {
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(orientationDidChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func orientationDidChange() {
+        let orientation = UIDevice.current.orientation
+        if orientation != .faceUp && orientation != .faceDown && orientation != .unknown {
+            deviceOrientation = orientation
         }
-    }
-    
-    func requestLocationPermission() {
-        print("Explicitly requesting location permission...")
-        locationManager.requestWhenInUseAuthorization()
     }
     
     private func setupLocationManager() {
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 1.0
+        locationManager = CLLocationManager()
+        locationManager?.delegate = self
+        locationManager?.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager?.requestWhenInUseAuthorization()
+        locationManager?.startUpdatingLocation()
+        locationManager?.startUpdatingHeading()
+    }
+
+    func checkInitialPermissions() {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
         
-        let authStatus = locationManager.authorizationStatus
-        print("Current location authorization status: \(authStatus.rawValue)")
-        
-        switch authStatus {
+        switch status {
+        case .authorized:
+            hasPermission = true
+            if !isSimulator {
+                detectAvailableZoomLevels()
+                configureCameraSession()
+            }
         case .notDetermined:
-            print("Location permission not determined, requesting authorization...")
-            DispatchQueue.main.async {
-                self.locationString = "Requesting location permission..."
-                self.currentAddress = "Requesting permission..."
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    self.hasPermission = granted
+                    if granted && !self.isSimulator {
+                        self.detectAvailableZoomLevels()
+                        self.configureCameraSession()
+                    } else if self.isSimulator {
+                        self.errorMessage = "Camera is not available in the iOS Simulator"
+                    } else {
+                        self.errorMessage = "Camera access was denied"
+                    }
+                }
             }
-            locationManager.requestWhenInUseAuthorization()
         case .denied, .restricted:
-            DispatchQueue.main.async {
-                self.locationString = "Location access denied"
-                self.altitudeString = "N/A"
-                self.headingString = "N/A"
-                self.currentAddress = "Location access denied"
-            }
-            print("Location access denied or restricted")
-        case .authorizedWhenInUse, .authorizedAlways:
-            print("Location permission already granted, starting updates immediately")
-            startLocationUpdates()
+            hasPermission = false
+            errorMessage = "Camera access is required to take photos. Please enable camera access in Settings."
         @unknown default:
-            print("Unknown location authorization status, requesting permission")
-            locationManager.requestWhenInUseAuthorization()
+            hasPermission = false
+            errorMessage = "Unknown camera permission status"
         }
     }
     
-    private func startLocationUpdates() {
-        guard locationManager.authorizationStatus == .authorizedWhenInUse ||
-              locationManager.authorizationStatus == .authorizedAlways else {
-            print("Location not authorized")
-            return
-        }
+    private func detectAvailableZoomLevels() {
+        var zoomLevels: [CGFloat] = []
         
-        print("Starting location updates...")
-        locationManager.startUpdatingLocation()
-        locationManager.startUpdatingHeading()
-    }
-    
-    private func setupMotionManager() {
-        if motionManager.isDeviceMotionAvailable {
-            motionManager.deviceMotionUpdateInterval = 0.1
-            motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
-                guard let motion = motion else { return }
+        let position = currentPosition
+        
+        if position == .back {
+            // Ultra-wide (0.5x)
+            if AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil {
+                zoomLevels.append(0.5)
+            }
+            
+            // Wide (1x) - always present on back camera
+            if let wideCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+                zoomLevels.append(1.0)
                 
-                let pitch = motion.attitude.pitch
-                let roll = motion.attitude.roll
-                
-                let tiltDegrees = pitch * 180.0 / .pi
-                let rollDegrees = roll * 180.0 / .pi
-                
-                self?.currentTilt = tiltDegrees
-                self?.currentRoll = rollDegrees
-                self?.tiltString = String(format: "%.1f°", tiltDegrees)
-            }
-        }
-    }
-    
-    func startCamera() {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            
-            guard self.captureSession.inputs.isEmpty else { return }
-            
-            // Detect available camera lenses
-            self.detectAvailableLenses()
-            
-            self.captureSession.beginConfiguration()
-            
-            // Set to highest resolution photo preset for full quality
-            if self.captureSession.canSetSessionPreset(.hd4K3840x2160) {
-                self.captureSession.sessionPreset = .hd4K3840x2160
-            } else if self.captureSession.canSetSessionPreset(.photo) {
-                self.captureSession.sessionPreset = .photo
-            }
-            
-            // Start with the default lens (wide if available, otherwise first available)
-            let startingLens = self.availableLenses.contains(.wide) ? .wide : (self.availableLenses.first ?? .wide)
-            self.setupCameraForLens(startingLens)
-            
-            self.captureSession.commitConfiguration()
-            self.captureSession.startRunning()
-            
-            DispatchQueue.main.async {
-                self.selectedLens = startingLens
-                self.cameraStatus = "Camera Ready (\(startingLens.displayLabel))"
-            }
-            
-            print("Camera session started successfully with \(startingLens.rawValue) lens")
-        }
-    }
-    
-    private func detectAvailableLenses() {
-        var lenses: [CameraLens] = []
-        
-        // Check each lens type for availability
-        for lens in CameraLens.allCases {
-            if AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) != nil {
-                lenses.append(lens)
-            }
-        }
-        
-        DispatchQueue.main.async {
-            self.availableLenses = lenses
-        }
-        
-        print("Available lenses: \(lenses.map { $0.rawValue }.joined(separator: ", "))")
-    }
-    
-    private func setupCameraForLens(_ lens: CameraLens) {
-        // Remove existing inputs
-        for input in captureSession.inputs {
-            captureSession.removeInput(input)
-        }
-        
-        guard let camera = AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) else {
-            print("Unable to access \(lens.rawValue) camera")
-            return
-        }
-        
-        do {
-            let input = try AVCaptureDeviceInput(device: camera)
-            
-            if captureSession.canAddInput(input) {
-                captureSession.addInput(input)
-            }
-            
-            // Configure photo output for maximum quality and full resolution
-            if !captureSession.outputs.contains(photoOutput) && captureSession.canAddOutput(photoOutput) {
-                captureSession.addOutput(photoOutput)
-                
-                // Set to highest quality and full resolution
-                if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-                    // Use HEVC for better compression while maintaining quality
-                    photoOutput.isHighResolutionCaptureEnabled = true
+                // Check for 48MP sensor (iPhone 14 Pro+) that supports 2x
+                let format = wideCamera.activeFormat
+                let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                if dimensions.width >= 4000 {
+                    zoomLevels.append(2.0)
                 }
             }
             
-            print("Successfully configured camera for \(lens.rawValue)")
+            // Telephoto (2x or 3x depending on model)
+            if let teleCamera = AVCaptureDevice.default(.builtInTelephotoCamera, for: .video, position: .back) {
+                let focalLength = teleCamera.activeFormat.approx35mmFocalLength
+                if focalLength > 70 {
+                    zoomLevels.append(3.0)  // iPhone 14 Pro+ has 3x
+                } else {
+                    zoomLevels.append(2.0)  // Older models have 2x
+                }
+            }
+        } else {
+            // Front camera
+            if AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil {
+                zoomLevels.append(1.0)
+            }
+        }
+        
+        zoomLevels = Array(Set(zoomLevels)).sorted()
+        
+        if zoomLevels.isEmpty {
+            zoomLevels.append(1.0)
+        }
+        
+        DispatchQueue.main.async {
+            self.availableZoomLevels = zoomLevels
             
-        } catch {
-            print("Error setting up camera for \(lens.rawValue): \(error)")
+            if self.currentZoom == 0 || !zoomLevels.contains(self.currentZoom) {
+                if let firstZoom = zoomLevels.first {
+                    self.currentZoom = firstZoom
+                }
+            }
         }
     }
     
-    func switchToLens(_ lens: CameraLens) {
-        guard availableLenses.contains(lens), lens != selectedLens else { return }
+    func configureCameraSession() {
+        guard !session.isRunning || !isCameraReady else {
+            print("Camera session already configured and running")
+            return
+        }
         
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            
-            self.captureSession.beginConfiguration()
-            self.setupCameraForLens(lens)
-            self.captureSession.commitConfiguration()
+        DispatchQueue.main.async {
+            self.isCameraReady = false
+        }
+        
+        sessionQueue.async {
+            self.configureCameraSessionLogic()
             
             DispatchQueue.main.async {
-                self.selectedLens = lens
-                self.cameraStatus = "Camera Ready (\(lens.displayLabel))"
+                if let firstZoom = self.availableZoomLevels.first {
+                    self.switchInternalCamera(firstZoom)
+                }
             }
-            
-            print("Switched to \(lens.rawValue) lens")
         }
     }
     
-    func stopCamera() {
-        captureSession.stopRunning()
+    private func configureCameraSessionLogic() {
+        session.beginConfiguration()
+        
+        for input in session.inputs {
+            session.removeInput(input)
+        }
+        for output in session.outputs {
+            session.removeOutput(output)
+        }
+        
+        session.sessionPreset = .photo
+        
+        var camera: AVCaptureDevice?
+        
+        if currentPosition == .back {
+            // Select the appropriate camera based on current zoom level
+            if currentZoom == 0.5 {
+                camera = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
+                print("Configuring ultra-wide camera for zoom \(currentZoom)")
+            } else if currentZoom == 1.0 {
+                camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+                print("Configuring wide-angle camera for zoom \(currentZoom)")
+            } else if currentZoom >= 2.0 {
+                camera = AVCaptureDevice.default(.builtInTelephotoCamera, for: .video, position: .back)
+                print("Configuring telephoto camera for zoom \(currentZoom)")
+            }
+            
+            // Fallback to wide-angle camera if target camera is not available
+            if camera == nil {
+                camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+                print("Fallback to wide-angle camera")
+            }
+        } else {
+            camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+        }
+        
+        guard let selectedCamera = camera else {
+            print("Unable to access camera")
+            session.commitConfiguration()
+            return
+        }
+        
+        currentDevice = selectedCamera
+        
+        do {
+            let input = try AVCaptureDeviceInput(device: selectedCamera)
+            if session.canAddInput(input) {
+                session.addInput(input)
+                currentInput = input
+            } else {
+                print("Cannot add camera input to session")
+                session.commitConfiguration()
+                return
+            }
+        } catch {
+            print("Error setting up camera input: \(error)")
+            session.commitConfiguration()
+            return
+        }
+        
+        photoOutput.isHighResolutionCaptureEnabled = true
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+        } else {
+            print("Cannot add photo output to session")
+        }
+        
+        session.commitConfiguration()
+        
+        self.session.startRunning()
+        
+        // ----------------------------------------------------------------------------------
+        // FIX: Use currentDevice.activeFormat.lensFocalLength (Available iOS 7.0+)
+        // ----------------------------------------------------------------------------------
         DispatchQueue.main.async {
-            self.cameraStatus = "Camera Stopped"
+            self.physicalFocalLength = selectedCamera.activeFormat.approx35mmFocalLength
+        }
+    }
+    
+    private func setupSessionObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sessionWasInterrupted),
+            name: .AVCaptureSessionWasInterrupted,
+            object: session
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sessionInterruptionEnded),
+            name: .AVCaptureSessionInterruptionEnded,
+            object: session
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sessionDidStartRunning),
+            name: .AVCaptureSessionDidStartRunning,
+            object: session
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sessionDidStopRunning),
+            name: .AVCaptureSessionDidStopRunning,
+            object: session
+        )
+    }
+    
+    private func setupAppLifecycleObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillResignActive),
+            name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
+    }
+
+    @objc private func appDidBecomeActive() {
+        if hasPermission && !isSimulator && !session.isRunning {
+            print("App is active, attempting final session reload.")
+            self.reloadCamera()
+        }
+    }
+    
+    @objc private func appWillResignActive() {
+        print("App will resign active, pausing camera session")
+        self.pauseSession()
+    }
+    
+    func attemptRestartSession() {
+        sessionQueue.asyncAfter(deadline: .now() + 0.5) {
+            self.performRestartAttempt()
+        }
+    }
+
+    private func performRestartAttempt() {
+        guard self.restartAttemptCount < self.maxRestartAttempts else {
+            print("Failed to restart session after \(self.maxRestartAttempts) retries. Camera likely held by another app.")
+            DispatchQueue.main.async { self.restartAttemptCount = 0 }
+            return
+        }
+        
+        if !self.session.isRunning {
+            print("Attempt #\(self.restartAttemptCount + 1): Calling session.startRunning()...")
+            
+            self.session.startRunning()
+            
+            self.sessionQueue.asyncAfter(deadline: .now() + 0.5) {
+                if !self.session.isRunning {
+                    self.restartAttemptCount += 1
+                    self.performRestartAttempt()
+                } else {
+                    print("Session successfully resumed after \(self.restartAttemptCount) retries.")
+                    DispatchQueue.main.async { self.restartAttemptCount = 0 }
+                }
+            }
+        } else {
+            DispatchQueue.main.async { self.restartAttemptCount = 0 }
+        }
+    }
+    
+    @objc private func sessionWasInterrupted(notification: NSNotification) {
+        print("AVCaptureSession was interrupted")
+        DispatchQueue.main.async {
+            self.isCameraReady = false
+            self.isCameraLocked = true
+        }
+    }
+    
+    @objc private func sessionInterruptionEnded(notification: NSNotification) {
+        print("AVCaptureSession interruption ended. Starting retry sequence...")
+        DispatchQueue.main.async {
+            self.restartAttemptCount = 0
+        }
+        self.attemptRestartSession()
+    }
+
+    @objc private func sessionDidStartRunning(notification: NSNotification) {
+        print("AVCaptureSession started running.")
+        
+        // Ensure zoom levels are properly detected after session starts
+        self.detectAvailableZoomLevels()
+        
+        // 🚨 FIX: Dispatch to main queue to set the session on the UI layer.
+        DispatchQueue.main.async {
+            self.previewLayerContainer.videoPreviewLayer.session = self.session
+            
+            self.isCameraReady = true
+            self.isCameraLocked = false
+            self.restartAttemptCount = 0
+            self.objectWillChange.send()
+        }
+    }
+
+    @objc private func sessionDidStopRunning(notification: NSNotification) {
+        print("AVCaptureSession stopped running.")
+        
+        // 🚨 FIX: Dispatch to main queue to clear the session from the UI layer.
+        DispatchQueue.main.async {
+            self.previewLayerContainer.videoPreviewLayer.session = nil
+            
+            self.isCameraReady = false
+        }
+    }
+    
+    func switchInternalCamera(_ zoom: CGFloat) {
+        sessionQueue.async {
+            if self.currentPosition == .back {
+                var targetCamera: AVCaptureDevice?
+                var targetDeviceType: AVCaptureDevice.DeviceType?
+                var targetZoomFactor: CGFloat = 1.0
+                
+                // Determine which camera and zoom factor to use
+                if zoom <= 0.5 {
+                    targetCamera = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
+                    targetDeviceType = .builtInUltraWideCamera
+                    targetZoomFactor = 1.0
+                } else if zoom <= 1.0 {
+                    targetCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+                    targetDeviceType = .builtInWideAngleCamera
+                    targetZoomFactor = 1.0
+                } else if zoom < 2.5 {
+                    // For 2x: check if telephoto is 2x native, otherwise use wide with digital zoom
+                    if let teleCamera = AVCaptureDevice.default(.builtInTelephotoCamera, for: .video, position: .back) {
+                        let focalLength = teleCamera.activeFormat.approx35mmFocalLength
+                        if focalLength < 70 {
+                            // 2x telephoto
+                            targetCamera = teleCamera
+                            targetDeviceType = .builtInTelephotoCamera
+                            targetZoomFactor = 1.0
+                        } else {
+                            // Use wide with 2x digital
+                            targetCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+                            targetDeviceType = .builtInWideAngleCamera
+                            targetZoomFactor = 2.0
+                        }
+                    } else {
+                        targetCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+                        targetDeviceType = .builtInWideAngleCamera
+                        targetZoomFactor = 2.0
+                    }
+                } else {
+                    // 3x telephoto
+                    targetCamera = AVCaptureDevice.default(.builtInTelephotoCamera, for: .video, position: .back)
+                    targetDeviceType = .builtInTelephotoCamera
+                    targetZoomFactor = 1.0
+                }
+                
+                guard let targetCamera = targetCamera, let targetType = targetDeviceType else {
+                    return
+                }
+                
+                // Switch camera if needed
+                if self.currentDevice?.deviceType != targetType {
+                    print("Switching to \(targetType) for zoom \(zoom)x")
+                    self.switchToCameraLogic(targetCamera)
+                }
+
+                // Set zoom factor
+                do {
+                    try targetCamera.lockForConfiguration()
+                    targetCamera.videoZoomFactor = targetZoomFactor
+                    targetCamera.unlockForConfiguration()
+
+                    DispatchQueue.main.async {
+                        self.currentZoom = zoom
+                        self.baseZoomFactor = targetZoomFactor
+                        self.physicalFocalLength = targetCamera.activeFormat.approx35mmFocalLength
+                    }
+                } catch {
+                    print("Error setting zoom: \(error)")
+                }
+            }
+        }
+    }
+    
+    func handlePinchZoom(scale: CGFloat) {
+        sessionQueue.async {
+            guard let device = self.currentDevice else { return }
+            
+            let newZoom = self.baseZoomFactor * scale
+            let clampedZoom = min(max(newZoom, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
+            
+            do {
+                try device.lockForConfiguration()
+                device.videoZoomFactor = clampedZoom
+                device.unlockForConfiguration()
+                DispatchQueue.main.async {
+                    // Update currentZoom to reflect actual zoom for button highlighting
+                    self.currentZoom = clampedZoom
+                    self.physicalFocalLength = device.activeFormat.approx35mmFocalLength
+                }
+            } catch {
+                print("Error handling pinch zoom: \(error)")
+            }
+        }
+    }
+    
+    func finalizePinchZoom() {
+        sessionQueue.async {
+            guard let device = self.currentDevice else { return }
+            DispatchQueue.main.async {
+                self.baseZoomFactor = device.videoZoomFactor
+            }
+        }
+    }
+    
+    func getClosestZoomLevel() -> CGFloat {
+        guard !availableZoomLevels.isEmpty else { return currentZoom }
+        
+        var closest = availableZoomLevels[0]
+        var minDifference = abs(currentZoom - closest)
+        
+        for level in availableZoomLevels {
+            let difference = abs(currentZoom - level)
+            if difference < minDifference {
+                minDifference = difference
+                closest = level
+            }
+        }
+        
+        return closest
+    }
+    
+    private func switchToCameraLogic(_ newCamera: AVCaptureDevice) {
+        session.beginConfiguration()
+        
+        if let currentInput = currentInput {
+            session.removeInput(currentInput)
+        }
+        
+        do {
+            let newInput = try AVCaptureDeviceInput(device: newCamera)
+            if session.canAddInput(newInput) {
+                session.addInput(newInput)
+                currentInput = newInput
+                currentDevice = newCamera
+            }
+        } catch {
+            print("Error switching camera lens: \(error)")
+        }
+        
+        session.commitConfiguration()
+    }
+    
+    func switchCamera() {
+        currentPosition = currentPosition == .back ? .front : .back
+        
+        sessionQueue.async {
+            self.session.beginConfiguration()
+            
+            if let currentInput = self.currentInput {
+                self.session.removeInput(currentInput)
+            }
+            
+            var newCamera: AVCaptureDevice?
+            let position = self.currentPosition
+            
+            // Always start with wide-angle camera when switching positions
+            if position == .back {
+                newCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+            } else {
+                newCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+            }
+            
+            guard let selectedCamera = newCamera else {
+                print("Unable to access camera")
+                self.session.commitConfiguration()
+                return
+            }
+            
+            self.currentDevice = selectedCamera
+            
+            do {
+                let newInput = try AVCaptureDeviceInput(device: selectedCamera)
+                if self.session.canAddInput(newInput) {
+                    self.session.addInput(newInput)
+                    self.currentInput = newInput
+                }
+            } catch {
+                print("Error switching camera: \(error)")
+            }
+            
+            self.session.commitConfiguration()
+            
+            DispatchQueue.main.async {
+                // Update focal length for new camera
+                if let selectedCamera = self.currentDevice {
+                    self.physicalFocalLength = selectedCamera.activeFormat.approx35mmFocalLength
+                }
+                
+                // Re-detect available zoom levels for the new camera position
+                self.detectAvailableZoomLevels()
+                
+                // Reset to 1x zoom when switching cameras
+                self.currentZoom = 1.0
+                self.baseZoomFactor = 1.0
+                self.switchInternalCamera(1.0)
+            }
+        }
+    }
+    
+    func pauseSession() {
+        print("Pausing camera session")
+        sessionQueue.async {
+            if self.session.isRunning {
+                print("Pausing camera session on serial queue")
+                self.session.stopRunning()
+            }
+        }
+    }
+    
+    func reloadCamera() {
+        print("Manual camera reload requested (or view re-entry)")
+        
+        DispatchQueue.main.async {
+            self.isCameraReady = false
+            self.isCameraLocked = false
+        }
+        
+        sessionQueue.async {
+            if self.session.isRunning {
+                print("Stopping running session on serial queue...")
+                self.session.stopRunning()
+            }
+            
+            if self.hasPermission && !self.isSimulator {
+                print("Reconfiguring camera session on serial queue...")
+                self.configureCameraSessionLogic()
+            }
         }
     }
     
     func capturePhoto() {
-        let settings = AVCapturePhotoSettings()
-        settings.flashMode = .auto
-        photoOutput.capturePhoto(with: settings, delegate: self)
-    }
-    
-    private func compassDirection(from heading: Double) -> String {
-        let directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
-        let index = Int((heading + 11.25) / 22.5) % 16
-        return directions[index]
-    }
-    
-    private func reverseGeocode(location: CLLocation) {
-        // Only geocode if location has changed significantly (more than 50 meters)
-        if let lastLocation = lastGeocodedLocation,
-           location.distance(from: lastLocation) < 50 {
-            return
+        guard !isCapturing else { return }
+        
+        DispatchQueue.main.async {
+            self.isCapturing = true
         }
         
-        // Cancel any ongoing geocoding requests
-        geocoder.cancelGeocode()
-        
-        print("Starting reverse geocoding for: \(location.coordinate.latitude), \(location.coordinate.longitude)")
-        
-        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
-            if let error = error {
-                print("Reverse geocoding error: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self?.currentAddress = "Address lookup failed"
-                }
-                return
-            }
-            
-            guard let placemark = placemarks?.first else {
-                print("No placemark found for location")
-                DispatchQueue.main.async {
-                    self?.currentAddress = "No address found"
-                }
-                return
-            }
-            
-            // Format address similar to Google Maps format
-            var addressComponents: [String] = []
-            
-            // Add street number and name
-            if let subThoroughfare = placemark.subThoroughfare,
-               let thoroughfare = placemark.thoroughfare {
-                addressComponents.append("\(subThoroughfare) \(thoroughfare)")
-            } else if let thoroughfare = placemark.thoroughfare {
-                addressComponents.append(thoroughfare)
-            }
-            
-            // Add city and state
-            if let locality = placemark.locality,
-               let administrativeArea = placemark.administrativeArea {
-                addressComponents.append("\(locality), \(administrativeArea)")
-            } else if let locality = placemark.locality {
-                addressComponents.append(locality)
-            } else if let administrativeArea = placemark.administrativeArea {
-                addressComponents.append(administrativeArea)
-            }
-            
-            let formattedAddress = addressComponents.joined(separator: " | ")
-            
-            print("Successfully geocoded address: \(formattedAddress)")
-            DispatchQueue.main.async {
-                self?.currentAddress = formattedAddress.isEmpty ? "Address unavailable" : formattedAddress
-                self?.lastGeocodedLocation = location
-            }
+        sessionQueue.async {
+            let settings = AVCapturePhotoSettings()
+            self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
     }
     
-    func updateOrientation(_ orientation: UIDeviceOrientation) {
-        currentOrientation = orientation
-        
-        guard let connection = previewLayer?.connection else { return }
-        
-        switch orientation {
+    private func exifOrientationFromDeviceOrientation() -> Int {
+        switch deviceOrientation {
         case .portrait:
-            connection.videoOrientation = .portrait
-        case .landscapeLeft:
-            connection.videoOrientation = .landscapeRight
-        case .landscapeRight:
-            connection.videoOrientation = .landscapeLeft
+            return 6
         case .portraitUpsideDown:
-            connection.videoOrientation = .portraitUpsideDown
+            return 8
+        case .landscapeLeft:
+            return 3
+        case .landscapeRight:
+            return 1
         default:
-            break
-        }
-        
-        print("Device orientation updated to: \(orientation.rawValue)")
-    }
-}
-
-// MARK: - Location Manager Delegate
-extension CameraManager: CLLocationManagerDelegate {
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        DispatchQueue.main.async {
-            self.locationAuthorizationStatus = manager.authorizationStatus
-        }
-        
-        print("Location authorization changed to: \(manager.authorizationStatus.rawValue)")
-        
-        switch manager.authorizationStatus {
-        case .notDetermined:
-            print("Location permission not determined - will request when needed")
-            DispatchQueue.main.async {
-                self.locationString = "Location permission pending..."
-                self.currentAddress = "Permission pending..."
-            }
-        case .denied, .restricted:
-            DispatchQueue.main.async {
-                self.locationString = "Enable location in Settings"
-                self.altitudeString = "N/A"
-                self.headingString = "N/A"
-                self.currentAddress = "Enable location in Settings"
-            }
-            print("Location access denied or restricted - user needs to enable in Settings")
-        case .authorizedWhenInUse, .authorizedAlways:
-            print("Location permission granted, starting location updates...")
-            DispatchQueue.main.async {
-                self.locationString = "Getting GPS fix..."
-                self.currentAddress = "Getting location..."
-            }
-            startLocationUpdates()
-        @unknown default:
-            print("Unknown location authorization status")
-            DispatchQueue.main.async {
-                self.locationString = "Unknown permission status"
-                self.currentAddress = "Permission error"
-            }
+            return 6
         }
     }
     
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        print("Location updated: \(location)")
-        print("Location accuracy: \(location.horizontalAccuracy) meters")
-        print("Altitude accuracy: \(location.verticalAccuracy) meters")
+    private func addEXIFMetadata(to imageData: Data) -> Data? {
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
+              let imageProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            return nil
+        }
         
-        currentLocation = location
+        var metadata = imageProperties
+        let now = Date()
         
-        let lat = location.coordinate.latitude
-        let lon = location.coordinate.longitude
+        var tiffDict: [String: Any] = metadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] ?? [:]
+        tiffDict[kCGImagePropertyTIFFMake as String] = "Apple"
+        tiffDict[kCGImagePropertyTIFFModel as String] = UIDevice.current.model
+        tiffDict[kCGImagePropertyTIFFSoftware as String] = "PhotoAssistant"
         
-        if lat != 0.0 && lon != 0.0 && location.horizontalAccuracy < 100 {
-            // Trigger reverse geocoding for good location data
-            reverseGeocode(location: location)
+        tiffDict[kCGImagePropertyTIFFOrientation as String] = exifOrientationFromDeviceOrientation()
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        let dateString = dateFormatter.string(from: now)
+        tiffDict[kCGImagePropertyTIFFDateTime as String] = dateString
+        
+        metadata[kCGImagePropertyTIFFDictionary as String] = tiffDict
+        
+        var exifDict: [String: Any] = metadata[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
+        exifDict[kCGImagePropertyExifDateTimeOriginal as String] = dateString
+        exifDict[kCGImagePropertyExifDateTimeDigitized as String] = dateString
+        
+        if let device = currentDevice {
+            if device.exposureDuration.seconds > 0 {
+                exifDict[kCGImagePropertyExifExposureTime as String] = device.exposureDuration.seconds
+            }
+            exifDict[kCGImagePropertyExifISOSpeedRatings as String] = [Int(device.iso)]
+            exifDict[kCGImagePropertyExifFNumber as String] = device.lensAperture
+            exifDict[kCGImagePropertyExifLensModel as String] = device.localizedName
+        }
+        
+        exifDict[kCGImagePropertyExifSceneType as String] = 1
+        exifDict[kCGImagePropertyExifWhiteBalance as String] = 0
+        
+        metadata[kCGImagePropertyExifDictionary as String] = exifDict
+        
+        if let location = currentLocation {
+            var gpsDict: [String: Any] = [:]
             
-            DispatchQueue.main.async {
-                self.locationString = String(format: "%.6f, %.6f", lat, lon)
-                
-                if location.verticalAccuracy < 0 {
-                    self.altitudeString = "Unknown"
-                } else {
-                    let altitudeFeet = location.altitude * 3.28084
-                    self.altitudeString = String(format: "%.0f'", altitudeFeet)
+            let latitude = location.coordinate.latitude
+            let longitude = location.coordinate.longitude
+            
+            gpsDict[kCGImagePropertyGPSLatitude as String] = abs(latitude)
+            gpsDict[kCGImagePropertyGPSLatitudeRef as String] = latitude >= 0 ? "N" : "S"
+            gpsDict[kCGImagePropertyGPSLongitude as String] = abs(longitude)
+            gpsDict[kCGImagePropertyGPSLongitudeRef as String] = longitude >= 0 ? "E" : "W"
+            
+            let altitude = location.altitude
+            gpsDict[kCGImagePropertyGPSAltitude as String] = abs(altitude)
+            gpsDict[kCGImagePropertyGPSAltitudeRef as String] = altitude >= 0 ? 0 : 1
+            
+            if let heading = currentHeading {
+                if heading.trueHeading >= 0 {
+                    gpsDict[kCGImagePropertyGPSImgDirection as String] = heading.trueHeading
+                    gpsDict[kCGImagePropertyGPSImgDirectionRef as String] = "T"
+                } else if heading.magneticHeading >= 0 {
+                    gpsDict[kCGImagePropertyGPSImgDirection as String] = heading.magneticHeading
+                    gpsDict[kCGImagePropertyGPSImgDirectionRef as String] = "M"
                 }
             }
-        } else if location.horizontalAccuracy >= 100 {
-            DispatchQueue.main.async {
-                self.locationString = "GPS acquiring... (±\(Int(location.horizontalAccuracy))m)"
-                self.altitudeString = "Acquiring..."
+            
+            let gpsDateFormatter = DateFormatter()
+            gpsDateFormatter.dateFormat = "yyyy:MM:dd"
+            gpsDateFormatter.timeZone = TimeZone(identifier: "UTC")
+            gpsDict[kCGImagePropertyGPSDateStamp as String] = gpsDateFormatter.string(from: location.timestamp)
+            
+            gpsDateFormatter.dateFormat = "HH:mm:ss"
+            gpsDict[kCGImagePropertyGPSTimeStamp as String] = gpsDateFormatter.string(from: location.timestamp)
+            
+            gpsDict[kCGImagePropertyGPSProcessingMethod as String] = "GPS"
+            
+            if location.speed >= 0 {
+                gpsDict[kCGImagePropertyGPSSpeed as String] = location.speed
+                gpsDict[kCGImagePropertyGPSSpeedRef as String] = "K"
             }
-        } else {
-            DispatchQueue.main.async {
-                self.locationString = "GPS searching..."
-                self.altitudeString = "Searching..."
-            }
+            
+            metadata[kCGImagePropertyGPSDictionary as String] = gpsDict
         }
+        
+        guard let mutableData = CFDataCreateMutable(nil, 0),
+              let destination = CGImageDestinationCreateWithData(mutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
+            return nil
+        }
+        
+        CGImageDestinationAddImage(destination, cgImage, metadata as CFDictionary)
+        
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+        
+        return mutableData as Data
     }
     
-    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        guard newHeading.headingAccuracy >= 0 else {
-            headingString = "Compass calibrating..."
-            return
-        }
-        
-        currentHeading = newHeading
-        let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
-        let direction = compassDirection(from: heading)
-        headingString = String(format: "%.0f° %@", heading, direction)
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        let clError = error as? CLError
-        let errorCode = clError?.code.rawValue ?? -1
-        
-        print("Location manager failed with error: \(error.localizedDescription)")
-        print("Error code: \(errorCode)")
-        
-        if let clError = clError {
-            switch clError.code {
-            case .denied:
-                print("Location access denied - user needs to enable location in Settings")
-                DispatchQueue.main.async {
-                    self.locationString = "Location denied in Settings"
-                    self.currentAddress = "Enable location in Settings"
-                }
-            case .locationUnknown:
-                print("Location unknown - GPS signal may be weak")
-                DispatchQueue.main.async {
-                    self.locationString = "GPS signal weak"
-                    self.currentAddress = "Searching for GPS signal..."
-                }
-            case .network:
-                print("Network error - check internet connection")
-                DispatchQueue.main.async {
-                    self.locationString = "Network error"
-                    self.currentAddress = "Check internet connection"
-                }
-            default:
-                print("Other location error: \(clError.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.locationString = "Location error (\(errorCode))"
-                    self.currentAddress = "Location service error"
-                }
+    deinit {
+        if session.isRunning {
+            sessionQueue.sync {
+                self.session.stopRunning()
             }
-        }
-        
-        DispatchQueue.main.async {
-            self.altitudeString = "Error"
-            self.headingString = "Error"
         }
     }
 }
 
-// MARK: - Photo Capture Delegate
-extension CameraManager: AVCapturePhotoCaptureDelegate {
+// MARK: - AVCaptureVideoPreviewLayer Integration
+
+class PreviewViewContainer: UIView {
+    override class var layerClass: AnyClass {
+        return AVCaptureVideoPreviewLayer.self
+    }
+    
+    var videoPreviewLayer: AVCaptureVideoPreviewLayer {
+        return layer as! AVCaptureVideoPreviewLayer
+    }
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        // Start with .resizeAspectFill as default
+        self.videoPreviewLayer.videoGravity = .resizeAspectFill
+        self.backgroundColor = .black
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+struct CameraPreviewView: UIViewRepresentable {
+    let container: UIView
+    let showCropMarks: Bool
+    
+    func makeUIView(context: Context) -> UIView {
+        return container
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {
+        DispatchQueue.main.async {
+            let bounds = uiView.bounds
+            if bounds.width > 0 && bounds.height > 0 {
+                uiView.layer.frame = bounds
+            }
+            
+            // Update video gravity based on crop marks visibility
+            if let previewContainer = uiView as? PreviewViewContainer {
+                previewContainer.videoPreviewLayer.videoGravity = showCropMarks ? .resizeAspect : .resizeAspectFill
+            }
+        }
+    }
+}
+
+// MARK: - Delegate Extensions
+
+extension CameraManager {
+    // AVCapturePhotoCaptureDelegate implementation
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        defer {
+            DispatchQueue.main.async {
+                self.isCapturing = false
+            }
+        }
+        
         if let error = error {
             print("Error capturing photo: \(error)")
             return
         }
         
         guard let imageData = photo.fileDataRepresentation() else {
-            print("Error: could not get image data")
+            print("Unable to get image data")
             return
         }
         
-        // Create image with EXIF metadata embedded including proper orientation
-        let imageWithMetadata = addEXIFMetadata(to: imageData)
-        
-        // Create UIImage with proper orientation handling
-        guard let image = UIImage(data: imageWithMetadata) else {
-            print("Error: could not create UIImage from data")
+        guard let dataWithMetadata = addEXIFMetadata(to: imageData) else {
+            print("Failed to add EXIF metadata")
             return
         }
         
-        // Apply proper orientation to the image before adding banner
-        let orientedImage = applyProperOrientation(to: image)
-        let imageWithBanner = addLocationBanner(to: orientedImage)
-        
-        // Convert the final image back to data to preserve metadata
-        guard let finalImageData = imageWithBanner.jpegData(compressionQuality: 0.95) else {
-            print("Error: could not convert final image to JPEG data")
-            return
+        Task { @MainActor in
+            guard let modelContext = self.modelContext else {
+                print("Model context not available")
+                return
+            }
+            
+            let photoAssistant = PhotoAssistant(imageData: dataWithMetadata)
+            
+            let (location, placemarkInfo) = await self.geocodeManager.processImageLocation(dataWithMetadata)
+            
+            if let location = location {
+                photoAssistant.location = location
+            }
+            
+            if let placemarkInfo = placemarkInfo {
+                photoAssistant.placemarkInfo = placemarkInfo
+            }
+            
+            modelContext.insert(photoAssistant)
+            
+            try? modelContext.save()
+            
+            print("Photo saved with location: \(location?.coordinate.latitude ?? 0), \(location?.coordinate.longitude ?? 0)")
         }
+    }
+}
+
+extension CameraManager {
+    // CLLocationManagerDelegate implementations
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        currentLocation = locations.last
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        currentHeading = newHeading
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("Location manager error: \(error.localizedDescription)")
+    }
+}
+
+extension AVCaptureDevice.Format {
+    /// Approximate 35mm equivalent focal length from field of view (using 36mm horizontal width).
+    var approx35mmFocalLength: CGFloat {
+        // Use 35mm horizontal width (36.0mm) for the standard reference
+        let thirtyFiveMmFilmWidth: CGFloat = 36.0 // 60.0
         
-        // Re-add metadata to the final image data (since adding banner removes it)
-        let finalImageWithMetadata = addEXIFMetadata(to: finalImageData)
-        
-        // Save the photo with metadata to photo library
-        Task {
-            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-            if status == .authorized {
-                do {
-                    try await PHPhotoLibrary.shared().performChanges {
-                        // Create the asset creation request
-                        let creationRequest = PHAssetCreationRequest.forAsset()
-                        
-                        // Add the image data with metadata
-                        creationRequest.addResource(with: .photo, data: finalImageWithMetadata, options: nil)
-                        
-                        // Set location data directly on the asset if available
-                        if let location = self.currentLocation {
-                            creationRequest.location = location
-                            print("Set location directly on PHAsset: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        // Ensure the Float value from AVFoundation is cast to CGFloat
+        let fovDegrees: CGFloat = CGFloat(self.videoFieldOfView)
+
+        if fovDegrees > 0 {
+            let fovRadians = fovDegrees * .pi / 180.0
+            // Formula: F = W / (2 * tan(HFOV/2))
+            return thirtyFiveMmFilmWidth / (2 * tan(fovRadians / 2))
+        }
+        return 0
+    }
+}
+
+// MARK: - Crop Marks Support Types
+
+// Helper struct for zoom lens UI (distinct from MyGearModel's Lens struct)
+struct ZoomLens: Identifiable, Equatable {
+    let id = UUID()
+    var name: String
+    var minFocal: Int
+    var maxFocal: Int
+}
+
+struct CropMarksOverlay: View {
+    // MODIFIED: Accepts individual capture plane dimensions instead of a FilmFormat struct
+    let capturePlaneWidth: Double
+    let capturePlaneHeight: Double
+    let capturePlaneDiagonal: Double
+    
+    let selectedFocalLength: Int
+    let currentCameraFocalLength: Int
+    let isVisible: Bool
+    let isZoomLens: Bool
+    // MODIFIED: Use a property to hold the default range for visualization
+    let defaultZoomRange: (min: Int, max: Int) = (35, 75)
+    
+    var body: some View {
+        if isVisible {
+            GeometryReader { geometry in
+                let cropFrame = calculateCropFrame(
+                    for: selectedFocalLength,
+                    cameraFocalLength: currentCameraFocalLength,
+                    // MODIFIED: Pass dimensions
+                    capturePlaneWidth: capturePlaneWidth,
+                    capturePlaneHeight: capturePlaneHeight,
+                    capturePlaneDiagonal: capturePlaneDiagonal,
+                    in: geometry.size
+                )
+                
+                ZStack {
+                    // Semi-transparent overlay to dim the area outside the crop
+                    Rectangle()
+                        .fill(Color.black.opacity(0.3))
+                        .mask(
+                            Rectangle()
+                                .fill(Color.white)
+                                .overlay(
+                                    Rectangle()
+                                        .frame(width: cropFrame.width, height: cropFrame.height)
+                                        .blendMode(.destinationOut)
+                                )
+                        )
+                    
+                    // Show zoom range visualization only when zoom lens is selected
+                    if isZoomLens {
+                        zoomRangeVisualization(geometry: geometry)
+                    }
+                    
+                    // Current focal length crop frame outline - change color based on visibility
+                    Rectangle()
+                        .stroke(cropFrame.isVisible ? Color.white : Color.red, lineWidth: 2)
+                        .frame(width: cropFrame.width, height: cropFrame.height)
+                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                    
+                    // Corner marks for current focal length - change color based on visibility
+                    Group {
+                        cornerMark(at: .topLeading, in: cropFrame, geometry: geometry, isVisible: cropFrame.isVisible)
+                        cornerMark(at: .topTrailing, in: cropFrame, geometry: geometry, isVisible: cropFrame.isVisible)
+                        cornerMark(at: .bottomLeading, in: cropFrame, geometry: geometry, isVisible: cropFrame.isVisible)
+                        cornerMark(at: .bottomTrailing, in: cropFrame, geometry: geometry, isVisible: cropFrame.isVisible)
+                    }
+                    
+                    // Center dot
+                    Circle()
+                        .fill(Color.white.opacity(0.8))
+                        .frame(width: 6, height: 6)
+                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                    
+                    // Status message when crop marks are outside viewfinder
+                    if !cropFrame.isVisible {
+                        VStack {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Crop marks outside viewfinder")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.red)
+                                    Text(cropFrame.width > geometry.size.width ? "Zoom out or select shorter lens" : "Zoom in or select longer lens")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.8))
+                                .cornerRadius(8)
+                                Spacer()
+                            }
+                            .padding(.top, 140)
+                            .padding(.leading, 20)
+                            Spacer()
                         }
-                        
-                        // Set creation date
-                        creationRequest.creationDate = Date()
                     }
-                    DispatchQueue.main.async {
-                        print("Photo saved successfully with GPS metadata and banner")
+                }
+            }
+        }
+    }
+    
+    private func zoomRangeVisualization(geometry: GeometryProxy) -> some View {
+        let minCropFrame = calculateCropFrame(
+            for: defaultZoomRange.min, // MODIFIED: Use defaultZoomRange
+            cameraFocalLength: currentCameraFocalLength,
+            capturePlaneWidth: capturePlaneWidth, // NEW
+            capturePlaneHeight: capturePlaneHeight, // NEW
+            capturePlaneDiagonal: capturePlaneDiagonal, // NEW
+            in: geometry.size
+        )
+        
+        let maxCropFrame = calculateCropFrame(
+            for: defaultZoomRange.max, // MODIFIED: Use defaultZoomRange
+            cameraFocalLength: currentCameraFocalLength,
+            capturePlaneWidth: capturePlaneWidth, // NEW
+            capturePlaneHeight: capturePlaneHeight, // NEW
+            capturePlaneDiagonal: capturePlaneDiagonal, // NEW
+            in: geometry.size
+        )
+        
+        let centerX = geometry.size.width / 2
+        let centerY = geometry.size.height / 2
+        
+        return ZStack {
+            // Outer frame (wide end - 35mm)
+            Rectangle()
+                .stroke(Color.green.opacity(0.6), lineWidth: 1)
+                .frame(width: minCropFrame.width, height: minCropFrame.height)
+                .position(x: centerX, y: centerY)
+            
+            // Inner frame (tele end - 75mm)
+            Rectangle()
+                .stroke(Color.blue.opacity(0.6), lineWidth: 1)
+                .frame(width: maxCropFrame.width, height: maxCropFrame.height)
+                .position(x: centerX, y: centerY)
+            
+            // Corner dots for extreme focal lengths
+            Group {
+                // Wide end corners (35mm)
+                cornerDot(at: .topLeading, frameSize: minCropFrame, geometry: geometry, color: .green)
+                cornerDot(at: .topTrailing, frameSize: minCropFrame, geometry: geometry, color: .green)
+                cornerDot(at: .bottomLeading, frameSize: minCropFrame, geometry: geometry, color: .green)
+                cornerDot(at: .bottomTrailing, frameSize: minCropFrame, geometry: geometry, color: .green)
+                
+                // Tele end corners (75mm)
+                cornerDot(at: .topLeading, frameSize: maxCropFrame, geometry: geometry, color: .blue)
+                cornerDot(at: .topTrailing, frameSize: maxCropFrame, geometry: geometry, color: .blue)
+                cornerDot(at: .bottomLeading, frameSize: maxCropFrame, geometry: geometry, color: .blue)
+                cornerDot(at: .bottomTrailing, frameSize: maxCropFrame, geometry: geometry, color: .blue)
+            }
+            
+            // Focal length labels for extremes
+            VStack {
+                HStack {
+                    Text("\(defaultZoomRange.min)mm") // MODIFIED: Use defaultZoomRange
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.green)
+                        .padding(4)
+                        .background(Color.black.opacity(0.6))
+                        .cornerRadius(4)
+                        .position(x: centerX - minCropFrame.width/2 + 30, y: centerY - minCropFrame.height/2 + 15)
+                    
+                    Spacer()
+                    
+                    Text("\(defaultZoomRange.max)mm") // MODIFIED: Use defaultZoomRange
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.blue)
+                        .padding(4)
+                        .background(Color.black.opacity(0.6))
+                        .cornerRadius(4)
+                        .position(x: centerX + maxCropFrame.width/2 - 30, y: centerY - maxCropFrame.height/2 + 15)
+                }
+                
+                Spacer()
+            }
+        }
+    }
+    
+    private func cornerDot(at corner: CornerPosition, frameSize: (width: CGFloat, height: CGFloat, isVisible: Bool), geometry: GeometryProxy, color: Color) -> some View {
+        let centerX = geometry.size.width / 2
+        let centerY = geometry.size.height / 2
+        
+        let frameLeft = centerX - frameSize.width / 2
+        let frameRight = centerX + frameSize.width / 2
+        let frameTop = centerY - frameSize.height / 2
+        let frameBottom = centerY + frameSize.height / 2
+        
+        var x: CGFloat
+        var y: CGFloat
+        
+        switch corner {
+        case .topLeading:
+            x = frameLeft
+            y = frameTop
+        case .topTrailing:
+            x = frameRight
+            y = frameTop
+        case .bottomLeading:
+            x = frameLeft
+            y = frameBottom
+        case .bottomTrailing:
+            x = frameRight
+            y = frameBottom
+        }
+        
+        return Circle()
+            .fill(color.opacity(0.8))
+            .frame(width: 4, height: 4)
+            .position(x: x, y: y)
+    }
+
+    // MODIFIED: Function signature updated to use dynamic dimensions
+    private func calculateCropFrame(
+        for focalLength: Int,
+        cameraFocalLength: Int,
+        capturePlaneWidth: Double, // NEW: Used as FilmFormat.width
+        capturePlaneHeight: Double, // NEW
+        capturePlaneDiagonal: Double, // NEW
+        in screenSize: CGSize
+    ) -> (width: CGFloat, height: CGFloat, isVisible: Bool) {
+                
+        // 1. Define physical dimensions
+        // MODIFIED: Use the longer dimension for captureFrameWidth
+        let captureFrameWidth: Double = capturePlaneWidth > capturePlaneHeight ? capturePlaneWidth : capturePlaneHeight
+        let thirtyFiveMmFilmWidth: Double = 36.0  // Standard 35mm film width
+        
+        // 2. Empirical Calibration Factor
+        //let previewLayerCalibrationFactor: Double = 100.0 / captureFrameWidth
+        //let previewLayerCalibrationFactor: Double = captureFrameWidth / 36.0
+        //let previewLayerCalibrationFactor: Double = 0.8 // ** for 6x6cm from the 500c
+        //let previewLayerCalibrationFactor: Double = 1.4 // ** for 43.8x32.9 from the X2D
+        
+        // Using a linear relationship between the width of the sensor (capturePlaneWidth) and the
+        // required calibration factor. Coefficients derived from 6x6 (0.8) and X2D (1.4) data points
+        let slope: Double = -0.037037
+        let intercept: Double = 3.02222
+        let previewLayerCalibrationFactor: Double = (slope * captureFrameWidth) + intercept
+        
+        // Convert focal lengths to Double -- Keep These
+        let selectedFocalDouble = Double(focalLength)
+        let cameraFocalDouble = Double(cameraFocalLength)
+
+        // 3. Calculate the FOV for the SIMULATED LENS (using physical captureFrameWidth)
+        let simulatedCaptureFrameFovRadians = 2 * atan(captureFrameWidth / (2 * selectedFocalDouble))
+
+        // 4. Calculate the FOV for the ACTIVE IPHONE CAMERA (using 36.0mm reference)
+        let activeiPhoneCameraFovRadians = 2 * atan(thirtyFiveMmFilmWidth / (2 * cameraFocalDouble))
+
+        // 5. Determine the base geometric scaling factor
+        let baseScaleFactor = tan(simulatedCaptureFrameFovRadians / 2) / tan(activeiPhoneCameraFovRadians / 2)
+        
+        // 6. Apply the empirical calibration to the scale factor
+        let calibratedScaleFactor = baseScaleFactor * previewLayerCalibrationFactor
+        
+        // 7. Calculate the crop frame size
+        let baseCropWidth = screenSize.width * calibratedScaleFactor
+        
+        // MODIFIED: Use short dimension for horizontal (width), long dimension for vertical (height)
+        let shortDimension = min(capturePlaneWidth, capturePlaneHeight)
+        let longDimension = max(capturePlaneWidth, capturePlaneHeight)
+        
+        let cropWidth = baseCropWidth * CGFloat(shortDimension / captureFrameWidth)
+        let cropHeight = baseCropWidth * CGFloat(longDimension / captureFrameWidth)
+
+        // 8. Determine visibility and clamp dimensions
+        let minCropDisplaySize: CGFloat = 50
+        let maxCropDisplayRatio: CGFloat = 1.0
+
+        // Check if the crop is valid (large enough to see) and not excessively large
+        let isVisible = (cropWidth >= minCropDisplaySize && cropHeight >= minCropDisplaySize) &&
+                        (cropWidth <= screenSize.width * maxCropDisplayRatio && cropHeight <= screenSize.height * maxCropDisplayRatio)
+        
+        // Clamp the display size to prevent it from exceeding the screen's bounds
+        let displayWidth = min(cropWidth, screenSize.width)
+        let displayHeight = min(cropHeight, screenSize.height)
+        
+        return (width: displayWidth, height: displayHeight, isVisible: isVisible)
+    }
+    
+    private func cornerMark(at corner: CornerPosition, in cropFrame: (width: CGFloat, height: CGFloat, isVisible: Bool), geometry: GeometryProxy, isVisible: Bool) -> some View {
+        let markLength: CGFloat = 20
+        let markThickness: CGFloat = 2
+        let markColor = isVisible ? Color.white : Color.red
+        
+        let centerX = geometry.size.width / 2
+        let centerY = geometry.size.height / 2
+        
+        let frameLeft = centerX - cropFrame.width / 2
+        let frameRight = centerX + cropFrame.width / 2
+        let frameTop = centerY - cropFrame.height / 2
+        let frameBottom = centerY + cropFrame.height / 2
+        
+        var x: CGFloat
+        var y: CGFloat
+        var horizontalAlignment: HorizontalAlignment
+        var verticalAlignment: VerticalAlignment
+        
+        switch corner {
+        case .topLeading:
+            x = frameLeft
+            y = frameTop
+            horizontalAlignment = .leading
+            verticalAlignment = .top
+        case .topTrailing:
+            x = frameRight
+            y = frameTop
+            horizontalAlignment = .trailing
+            verticalAlignment = .top
+        case .bottomLeading:
+            x = frameLeft
+            y = frameBottom
+            horizontalAlignment = .leading
+            verticalAlignment = .bottom
+        case .bottomTrailing:
+            x = frameRight
+            y = frameBottom
+            horizontalAlignment = .trailing
+            verticalAlignment = .bottom
+        }
+        
+        return VStack(alignment: horizontalAlignment, spacing: 0) {
+            if verticalAlignment == .top {
+                Rectangle()
+                    .fill(markColor)
+                    .frame(width: markLength, height: markThickness)
+                Rectangle()
+                    .fill(markColor)
+                    .frame(width: markThickness, height: markLength)
+                    .alignmentGuide(.leading) { _ in
+                        horizontalAlignment == .leading ? 0 : markThickness - markLength
                     }
-                } catch {
-                    DispatchQueue.main.async {
-                        print("Error saving photo: \(error.localizedDescription)")
+            } else {
+                Rectangle()
+                    .fill(markColor)
+                    .frame(width: markThickness, height: markLength)
+                    .alignmentGuide(.leading) { _ in
+                        horizontalAlignment == .leading ? 0 : markThickness - markLength
                     }
+                Rectangle()
+                    .fill(markColor)
+                    .frame(width: markLength, height: markThickness)
+            }
+        }
+        .position(x: x, y: y)
+    }
+}
+
+struct CropMarksControlPanel: View {
+    // NEW: Accept gear list and selected gear
+    let gearList: [MyGearModel]
+    @Binding var selectedGear: MyGearModel?
+    
+    @Binding var selectedFocalLength: Int
+    let currentCameraFocalLength: Int
+    @Binding var showCropMarks: Bool
+    
+    // MODIFIED: Compute available lenses from selected gear instead of hardcoding
+    private var availableFixedLenses: [Int] {
+        guard let gear = selectedGear else { return [] }
+        return gear.lenses.filter { $0.type == .prime }.compactMap { $0.primeFocalLength }
+    }
+    
+    // MODIFIED: Compute available zoom lenses from selected gear
+    private var availableZoomLenses: [ZoomLens] {
+        guard let gear = selectedGear else { return [] }
+        return gear.lenses.filter { $0.type == .zoom && $0.zoomRange != nil }.map { lens in
+            ZoomLens(
+                name: lens.name,
+                minFocal: lens.zoomRange!.min,
+                maxFocal: lens.zoomRange!.max
+            )
+        }
+    }
+    
+    // MODIFIED: Tracks the currently selected zoom lens object, if any
+    @State private var selectedZoomLens: ZoomLens? = nil
+
+    // MARK: - Extracted Sub-Views for Compiler Stability
+
+    @ViewBuilder
+    private var cameraPickerView: some View {
+        VStack(spacing: 8) {
+            /*
+            HStack {
+                Text("Camera:")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.8))
+                Spacer()
+            }
+            */
+            
+            Picker("Select Camera", selection: $selectedGear) {
+                ForEach(gearList) { gear in
+                    Text(gear.cameraName)
+                        .tag(gear as MyGearModel?)
+                }
+            }
+            .pickerStyle(.menu)
+            .accentColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.1))
+            .cornerRadius(8)
+            .onChange(of: selectedGear) { oldValue, newValue in
+                // When camera changes, reset to first available prime lens or first lens
+                if let gear = newValue {
+                    if let firstPrime = gear.lenses.first(where: { $0.type == .prime })?.primeFocalLength {
+                        selectedFocalLength = firstPrime
+                    } else if let firstLens = gear.lenses.first {
+                        // If no prime lens, try zoom lens
+                        if firstLens.type == .zoom, let range = firstLens.zoomRange {
+                            selectedFocalLength = Int(round(Double(range.min + range.max) / 2.0))
+                        }
+                    }
+                    // Reset zoom lens selection
+                    selectedZoomLens = nil
+                    // Keep crop marks visible if they were visible
+                    if showCropMarks {
+                        withAnimation { showCropMarks = true }
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var currentCameraInfoView: some View {
+        HStack(spacing: 8) {
+            Text("Phone:")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.6))
+            
+            Text("\(currentCameraFocalLength)mm")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundColor(.yellow)
+            
+            Spacer()
+            
+            Text("FOV: \(Int(fieldOfView(for: currentCameraFocalLength)))°")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(.white.opacity(0.6))
+        }
+    }
+    
+    @ViewBuilder
+    private var lensButtonsView: some View {
+        HStack(spacing: 8) {
+            // Fixed focal length lenses
+            ForEach(availableFixedLenses, id: \.self) { focalLength in
+                fixedLensButton(focalLength: focalLength)
+            }
+            
+            // Zoom lenses
+            ForEach(availableZoomLenses) { zoom in
+                zoomLensButton(zoom: zoom)
+            }
+            
+            Spacer()
+        }
+    }
+    
+    @ViewBuilder
+    private func fixedLensButton(focalLength: Int) -> some View {
+        let isSelected = (selectedZoomLens == nil && selectedFocalLength == focalLength && showCropMarks)
+        
+        Button(action: {
+            if isSelected {
+                // Tapping the currently selected fixed lens: Turn OFF marks
+                withAnimation { showCropMarks = false }
+            } else {
+                // Tapping a new fixed lens: Turn ON marks
+                selectedFocalLength = focalLength
+                selectedZoomLens = nil // Ensure no zoom lens is active
+                withAnimation { showCropMarks = true }
+            }
+        }) {
+            Text("\(focalLength)mm")
+                .font(.system(size: 13, weight: isSelected ? .bold : .regular))
+                .foregroundColor(isSelected ? .black : .white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.white : Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                )
+                .cornerRadius(12)
+        }
+        .onTapGesture {
+            // Prevent panel tap when selecting lens
+        }
+    }
+    
+    @ViewBuilder
+    private func zoomLensButton(zoom: ZoomLens) -> some View {
+        let isSelected = (selectedZoomLens == zoom && showCropMarks)
+        
+        Button(action: {
+            if isSelected {
+                // Tapping the currently selected zoom lens: Turn OFF marks
+                withAnimation {
+                    showCropMarks = false
+                    selectedZoomLens = nil
                 }
             } else {
-                DispatchQueue.main.async {
-                    print("Photo library access denied")
+                // Tapping to select zoom lens: Turn ON marks
+                selectedZoomLens = zoom
+                // Set to middle of zoom range
+                selectedFocalLength = Int(round(Double(zoom.minFocal + zoom.maxFocal) / 2.0))
+                withAnimation { showCropMarks = true }
+            }
+        }) {
+            Text(zoom.name)
+                .font(.system(size: 13, weight: isSelected ? .bold : .regular))
+                .foregroundColor(isSelected ? .black : .white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.white : Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                )
+                .cornerRadius(12)
+        }
+        .onTapGesture {
+            // Prevent panel tap when selecting zoom lens
+        }
+    }
+
+    @ViewBuilder
+    private var zoomSliderView: some View {
+        // Zoom slider (only show when a zoom lens is selected)
+        if let activeZoomLens = selectedZoomLens {
+            VStack(spacing: 4) {
+                HStack {
+                    Text("\(activeZoomLens.minFocal)mm")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Text("\(selectedFocalLength)mm")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(.yellow)
+                    Spacer()
+                    Text("\(activeZoomLens.maxFocal)mm")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                
+                Slider(
+                    value: Binding(
+                        get: { Double(selectedFocalLength) },
+                        set: {
+                            selectedFocalLength = Int($0)
+                            // Ensure marks are visible when the slider is dragged
+                            if !showCropMarks {
+                                withAnimation { showCropMarks = true }
+                            }
+                        }
+                    ),
+                    in: Double(activeZoomLens.minFocal)...Double(activeZoomLens.maxFocal),
+                    step: 5
+                )
+                .accentColor(.white)
+                .onTapGesture {
+                    // Prevent panel tap when using slider
                 }
             }
-        }
-    }
-    
-    private func applyProperOrientation(to image: UIImage) -> UIImage {
-        // Camera captures based on device orientation - apply correct rotation for each case
-        switch currentOrientation {
-        case .portrait:
-            // Portrait: rotate 90° clockwise (right) to correct orientation
-            return rotateImage(image, by: .right)
-        case .portraitUpsideDown:
-            // Portrait upside down: rotate 90° counter-clockwise (left) to correct orientation
-            return rotateImage(image, by: .left)
-        case .landscapeLeft:
-            // Landscape left: no rotation needed - camera is already aligned correctly
-            return image
-        case .landscapeRight:
-            // Landscape right: rotate 180° to correct the upside down issue
-            return rotateImage(image, by: .down)
-        default:
-            // Default to portrait orientation
-            return rotateImage(image, by: .right)
-        }
-    }
-    
-    private func rotateImage(_ image: UIImage, by orientation: UIImage.Orientation) -> UIImage {
-        guard let cgImage = image.cgImage else { return image }
-        
-        return UIImage(cgImage: cgImage, scale: image.scale, orientation: orientation)
-    }
-    
-    private func addEXIFMetadata(to imageData: Data) -> Data {
-        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
-              let type = CGImageSourceGetType(source) else {
-            print("Error: Could not create image source")
-            return imageData
-        }
-        
-        // Create mutable data for the new image
-        let mutableData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(mutableData, type, 1, nil) else {
-            print("Error: Could not create image destination")
-            return imageData
-        }
-        
-        // Get existing metadata
-        var metadata: [String: Any] = [:]
-        if let existingMetadata = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] {
-            metadata = existingMetadata
-        }
-        
-        print("Original metadata keys: \(metadata.keys)")
-        
-        // Add GPS metadata if location is available
-        if let location = currentLocation {
-            let gpsDict = createGPSMetadata(location: location, heading: currentHeading)
-            metadata[kCGImagePropertyGPSDictionary as String] = gpsDict
-            
-            let latitude = location.coordinate.latitude
-            let longitude = location.coordinate.longitude
-            print("Added GPS metadata: lat=\(latitude), lon=\(longitude), alt=\(location.altitude)")
-            print("GPS dictionary contents: \(gpsDict)")
-        } else {
-            print("Warning: No location data available for GPS metadata")
-        }
-        
-        // EXIF orientation metadata feature disabled
-        // The orientation metadata is not being set to allow photo viewers to handle orientation naturally
-        print("EXIF orientation metadata disabled - letting photo viewers handle orientation naturally")
-        
-        // Add EXIF metadata
-        var exifDict: [String: Any] = metadata[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
-        
-        // Add comprehensive user comment with all sensor data
-        var userComment = "PhotoAssistant"
-        if let location = currentLocation {
-            userComment += String(format: " GPS:%.6f,%.6f", location.coordinate.latitude, location.coordinate.longitude)
-            if location.verticalAccuracy >= 0 {
-                userComment += String(format: " Alt:%.1fm", location.altitude)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.1))
+            .cornerRadius(8)
+            .onTapGesture {
+                // Prevent panel tap when interacting with zoom controls
             }
         }
-        if let heading = currentHeading {
-            let trueHeading = heading.trueHeading >= 0 ? heading.trueHeading : heading.magneticHeading
-            userComment += String(format: " Heading:%.1f°", trueHeading)
-        }
-        userComment += String(format: " Tilt:%.1f°", currentTilt)
-        
-        exifDict[kCGImagePropertyExifUserComment as String] = userComment
-        
-        // Add creation date
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        let currentDate = Date()
-        exifDict[kCGImagePropertyExifDateTimeOriginal as String] = dateFormatter.string(from: currentDate)
-        exifDict[kCGImagePropertyExifDateTimeDigitized as String] = dateFormatter.string(from: currentDate)
-        
-        metadata[kCGImagePropertyExifDictionary as String] = exifDict
-        
-        // Add TIFF metadata
-        var tiffDict: [String: Any] = metadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] ?? [:]
-        tiffDict[kCGImagePropertyTIFFSoftware as String] = "PhotoAssistant v1.0"
-        tiffDict[kCGImagePropertyTIFFDateTime as String] = dateFormatter.string(from: currentDate)
-        metadata[kCGImagePropertyTIFFDictionary as String] = tiffDict
-        
-        print("Final metadata keys before writing: \(metadata.keys)")
-        print("GPS dictionary exists: \(metadata[kCGImagePropertyGPSDictionary as String] != nil)")
-        
-        // Copy image with new metadata
-        CGImageDestinationAddImageFromSource(destination, source, 0, metadata as CFDictionary)
-        
-        if CGImageDestinationFinalize(destination) {
-            print("Successfully added EXIF metadata to image")
+    }
+    
+    @ViewBuilder
+    private var formatInfoView: some View {
+        HStack {
+            Text(selectedGear?.capturePlane ?? "6x6 cm (120 Film)")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(.white.opacity(0.6))
             
-            // Verify the metadata was actually written
-            if let verifySource = CGImageSourceCreateWithData(mutableData, nil),
-               let verifyMetadata = CGImageSourceCopyPropertiesAtIndex(verifySource, 0, nil) as? [String: Any] {
-                print("Verification - Final image metadata keys: \(verifyMetadata.keys)")
-                if let gpsData = verifyMetadata[kCGImagePropertyGPSDictionary as String] {
-                    print("Verification - GPS metadata successfully embedded: \(gpsData)")
-                } else {
-                    print("Warning - GPS metadata not found in final image!")
+            Spacer()
+            
+            Text("Target FOV: \(Int(fieldOfView(for: selectedFocalLength)))°")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(.white.opacity(0.6))
+        }
+    }
+    
+    // MARK: - Body
+
+    var body: some View {
+        VStack(spacing: 12) {
+            cameraPickerView
+            
+            currentCameraInfoView
+            
+            Divider()
+                .background(Color.white.opacity(0.3))
+            
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Lens Selection:")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.8))
+                    Spacer()
                 }
+                
+                lensButtonsView
+                
+                zoomSliderView
             }
             
-            return mutableData as Data
-        } else {
-            print("Error: Failed to finalize image with metadata")
-            return imageData
+            formatInfoView
         }
-    }
-    
-    private func addLocationBanner(to image: UIImage) -> UIImage {
-        let bannerHeight: CGFloat = 120  // Height for two lines of text
-        let padding: CGFloat = 16
-        let fontSize: CGFloat = 32       // Optimal size for readability
-        let lineSpacing: CGFloat = 8     // Space between lines
-        
-        // Format the timestamp in the requested format
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MMM-dd h:mm:ss a zzz"
-        let timestamp = dateFormatter.string(from: Date())
-        
-        // Format GPS coordinates with proper sign formatting
-        let gpsText: String
-        if let location = currentLocation {
-            let lat = location.coordinate.latitude
-            let lng = location.coordinate.longitude
-            let latSign = lat >= 0 ? "+" : ""
-            let lngSign = lng >= 0 ? "+" : ""
-            gpsText = String(format: "%@%.8f, %@%.8f", latSign, lat, lngSign, lng)
-        } else {
-            gpsText = "GPS not available"
-        }
-        
-        // Format heading with compass direction
-        let headingText: String
-        if let heading = currentHeading {
-            let trueHeading = heading.trueHeading >= 0 ? heading.trueHeading : heading.magneticHeading
-            let direction = compassDirection(from: trueHeading)
-            headingText = String(format: "%.0f° %@", trueHeading, direction)
-        } else {
-            headingText = "No heading"
-        }
-        
-        // Create the two-line banner text
-        let line1 = "Captured: \(timestamp) | \(currentAddress)"
-        let line2 = "Gps: \(gpsText) | Heading: \(headingText) | Altitude: \(altitudeString) | Azimuth: \(tiltString)"
-        
-        // Get the actual rendered size of the image (accounting for orientation)
-        let imageSize = image.size
-        let actualWidth = imageSize.width
-        let actualHeight = imageSize.height
-        
-        // Create new image size with banner at bottom
-        let newSize = CGSize(width: actualWidth, height: actualHeight + bannerHeight)
-        
-        UIGraphicsBeginImageContextWithOptions(newSize, false, image.scale)
-        guard let context = UIGraphicsGetCurrentContext() else {
-            return image
-        }
-        
-        // Draw original image properly oriented at the top
-        let imageRect = CGRect(x: 0, y: 0, width: actualWidth, height: actualHeight)
-        image.draw(in: imageRect)
-        
-        // Banner at the bottom
-        let bannerRect = CGRect(x: 0, y: actualHeight, width: actualWidth, height: bannerHeight)
-        
-        // Fill banner background with semi-transparent black
-        context.setFillColor(UIColor.black.withAlphaComponent(0.85).cgColor)
-        context.fill(bannerRect)
-        
-        // Configure text attributes with monospace font
-        let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.monospacedSystemFont(ofSize: fontSize, weight: .medium),
-            .foregroundColor: UIColor.white,
-            .backgroundColor: UIColor.clear
-        ]
-        
-        // Calculate text sizes and positions
-        let line1Size = line1.size(withAttributes: textAttributes)
-        let line2Size = line2.size(withAttributes: textAttributes)
-        
-        // Position text lines vertically centered in banner
-        let totalTextHeight = line1Size.height + lineSpacing + line2Size.height
-        let startY = actualHeight + (bannerHeight - totalTextHeight) / 2
-        
-        // Draw first line (centered horizontally)
-        let line1X = (actualWidth - line1Size.width) / 2
-        let line1Rect = CGRect(x: line1X, y: startY, width: line1Size.width, height: line1Size.height)
-        line1.draw(in: line1Rect, withAttributes: textAttributes)
-        
-        // Draw second line (centered horizontally)
-        let line2X = (actualWidth - line2Size.width) / 2
-        let line2Rect = CGRect(x: line2X, y: startY + line1Size.height + lineSpacing, width: line2Size.width, height: line2Size.height)
-        line2.draw(in: line2Rect, withAttributes: textAttributes)
-        
-        let newImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        
-        return newImage ?? image
-    }
-    
-    // MARK: - GPS Metadata Creation
-    private func createGPSMetadata(location: CLLocation, heading: CLHeading?) -> [String: Any] {
-        var gpsDict: [String: Any] = [:]
-        
-        print("Creating GPS metadata for location: \(location)")
-        
-        // Latitude - ensure proper numeric format
-        let latitude = location.coordinate.latitude
-        gpsDict[kCGImagePropertyGPSLatitude as String] = NSNumber(value: abs(latitude))
-        gpsDict[kCGImagePropertyGPSLatitudeRef as String] = (latitude < 0.0) ? "S" : "N"
-        print("GPS Latitude: \(abs(latitude)) \(latitude < 0.0 ? "S" : "N")")
-        
-        // Longitude - ensure proper numeric format
-        let longitude = location.coordinate.longitude
-        gpsDict[kCGImagePropertyGPSLongitude as String] = NSNumber(value: abs(longitude))
-        gpsDict[kCGImagePropertyGPSLongitudeRef as String] = (longitude < 0.0) ? "W" : "E"
-        print("GPS Longitude: \(abs(longitude)) \(longitude < 0.0 ? "W" : "E")")
-        
-        // Elevation (Altitude) - ensure proper numeric format
-        let altitude = location.altitude
-        gpsDict[kCGImagePropertyGPSAltitude as String] = NSNumber(value: abs(altitude))
-        gpsDict[kCGImagePropertyGPSAltitudeRef as String] = NSNumber(value: altitude < 0 ? 1 : 0) // 0 = above sea level, 1 = below sea level
-        print("GPS Altitude: \(abs(altitude))m \(altitude < 0 ? "below" : "above") sea level")
-        
-        // Horizontal accuracy
-        if location.horizontalAccuracy >= 0 {
-            gpsDict[kCGImagePropertyGPSHPositioningError as String] = NSNumber(value: location.horizontalAccuracy)
-            print("GPS Horizontal Accuracy: \(location.horizontalAccuracy)m")
-        }
-        
-        // Vertical accuracy for altitude
-        if location.verticalAccuracy >= 0 {
-            // Store vertical accuracy in GPS processing method or user comment since there's no direct EXIF field
-            print("GPS Vertical Accuracy: \(location.verticalAccuracy)m")
-        }
-        
-        // True Heading (Image Direction) - only if heading is available and valid
-        if let heading = heading {
-            if heading.trueHeading >= 0 {
-                gpsDict[kCGImagePropertyGPSImgDirection as String] = NSNumber(value: heading.trueHeading)
-                gpsDict[kCGImagePropertyGPSImgDirectionRef as String] = "T" // 'T' for True North
-                print("GPS True Heading: \(heading.trueHeading)°")
-            } else if heading.magneticHeading >= 0 {
-                // Fall back to magnetic heading if true heading not available
-                gpsDict[kCGImagePropertyGPSImgDirection as String] = NSNumber(value: heading.magneticHeading)
-                gpsDict[kCGImagePropertyGPSImgDirectionRef as String] = "M" // 'M' for Magnetic North
-                print("GPS Magnetic Heading: \(heading.magneticHeading)°")
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        //.background(Color.black.opacity(0.7))
+        //.background(Color(red: 0xa1/255, green: 0x03/255, blue: 0x03/255).opacity(0.9))
+        .background(Color(red: 0x2e/255, green: 0x2e/255, blue: 0x2e/255).opacity(0.9))
+        .cornerRadius(12)
+        .onAppear {
+            // Initialize selectedZoomLens state based on current selection
+            if let initialZoomLens = availableZoomLenses.first(where: {
+                selectedFocalLength >= $0.minFocal && selectedFocalLength <= $0.maxFocal
+            }) {
+                selectedZoomLens = initialZoomLens
             }
-            
-            // Add heading accuracy if available
-            if heading.headingAccuracy >= 0 {
-                print("GPS Heading Accuracy: ±\(heading.headingAccuracy)°")
-            }
-        } else {
-            print("No heading data available for GPS metadata")
         }
-        
-        // GPS Date and Time Stamps - use location timestamp for accuracy
-        let locationTimestamp = location.timestamp
-        gpsDict[kCGImagePropertyGPSTimeStamp as String] = DateFormatter.gpsTimeStampFormatter.string(from: locationTimestamp)
-        gpsDict[kCGImagePropertyGPSDateStamp as String] = DateFormatter.gpsDateStampFormatter.string(from: locationTimestamp)
-        print("GPS Timestamp: \(locationTimestamp)")
-        
-        // Additional standard GPS metadata
-        gpsDict[kCGImagePropertyGPSProcessingMethod as String] = "GPS"
-        gpsDict[kCGImagePropertyGPSMapDatum as String] = "WGS-84"
-        
-        // GPS Version - specify which GPS specification we're following
-        gpsDict[kCGImagePropertyGPSVersion as String] = "2.2.0.0"
-        
-        print("GPS metadata dictionary created with \(gpsDict.count) entries")
-        print("GPS dictionary keys: \(gpsDict.keys.sorted())")
-        
-        return gpsDict
     }
-}
-
-// MARK: - DateFormatter Extensions
-extension DateFormatter {
-    static let gpsDateStampFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy:MM:dd"
-        formatter.timeZone = TimeZone(secondsFromGMT: 0) // UTC
-        return formatter
-    }()
     
-    static let gpsTimeStampFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SS"
-        formatter.timeZone = TimeZone(secondsFromGMT: 0) // UTC
-        return formatter
-    }()
-}
-
-// MARK: - View Extension for Rotation Detection
-extension View {
-    func onRotate(perform action: @escaping (UIDeviceOrientation) -> Void) -> some View {
-        self.onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-            action(UIDevice.current.orientation)
+    private func fieldOfView(for focalLength: Int) -> Double {
+        // Calculate field of view using the selected gear's diagonal
+        guard let gear = selectedGear else {
+            // Fallback to 6x6 format diagonal
+            let filmDiagonal: Double = 84.85
+            let fovRadians = 2 * atan(filmDiagonal / (2 * Double(focalLength)))
+            return fovRadians * 180 / .pi
         }
+        
+        let filmDiagonal: Double = gear.capturePlaneDiagonal
+        let fovRadians = 2 * atan(filmDiagonal / (2 * Double(focalLength)))
+        return fovRadians * 180 / .pi // Convert to degrees
     }
 }
 
-#Preview {
-    CameraView()
-}

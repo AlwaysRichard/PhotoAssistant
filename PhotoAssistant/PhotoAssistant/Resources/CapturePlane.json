@@ -1,0 +1,128 @@
+[
+  {
+    "name": "35mm",
+    "width": 36,
+    "height": 24,
+    "diagonal": 43.27
+  },
+  {
+    "name": "Full Frame",
+    "width": 36,
+    "height": 24,
+    "diagonal": 43.27
+  },
+  {
+    "name": "APS-C (Canon)",
+    "width": 22.2,
+    "height": 14.8,
+    "diagonal": 26.68
+  },
+  {
+    "name": "APS-C (Nikon/Sony/Pentax)",
+    "width": 23.6,
+    "height": 15.7,
+    "diagonal": 28.35
+  },
+  {
+    "name": "Micro Four Thirds",
+    "width": 17.3,
+    "height": 13.0,
+    "diagonal": 21.64
+  },
+  {
+    "name": "Medium Format 6x4.5cm",
+    "width": 60,
+    "height": 45,
+    "diagonal": 75.0
+  },
+  {
+    "name": "Medium Format 6x6cm",
+    "width": 60,
+    "height": 60,
+    "diagonal": 84.85
+  },
+  {
+    "name": "Medium Format 6x7cm",
+    "width": 60,
+    "height": 70,
+    "diagonal": 92.20
+  },
+  {
+    "name": "Medium Format 6x9cm",
+    "width": 60,
+    "height": 90,
+    "diagonal": 108.17
+  },
+  {
+    "name": "Large Format 4x5",
+    "width": 101.6,
+    "height": 127.0,
+    "diagonal": 162.6
+  },
+  {
+    "name": "Large Format 8x10",
+    "width": 203.2,
+    "height": 254.0,
+    "diagonal": 320.0
+  },
+  {
+    "name": "1-inch Type Sensor",
+    "width": 13.2,
+    "height": 8.8,
+    "diagonal": 15.86
+  },
+  {
+    "name": "Super 35",
+    "width": 24.89,
+    "height": 18.66,
+    "diagonal": 31.0
+  },
+  {
+    "name": "ARRI Alexa LF",
+    "width": 36.7,
+    "height": 25.54,
+    "diagonal": 44.7
+  },
+  {
+    "name": "ARRI Alexa 65",
+    "width": 54.12,
+    "height": 25.58,
+    "diagonal": 59.1
+  },
+  {
+    "name": "RED Monstro 8K VV",
+    "width": 40.96,
+    "height": 21.6,
+    "diagonal": 46.3
+  },
+  {
+    "name": "Canon R5 Full Frame",
+    "width": 36,
+    "height": 24,
+    "diagonal": 43.27
+  },
+  {
+    "name": "Sony A7R IV",
+    "width": 35.9,
+    "height": 24.0,
+    "diagonal": 43.2
+  },
+  {
+    "name": "Hasselblad H6D-100c",
+    "width": 53.4,
+    "height": 40.0,
+    "diagonal": 66.8
+  },
+  {
+    "name": "Hasselblad X1D/X2D",
+    "width": 43.8,
+    "height": 32.9,
+    "diagonal": 54.6
+  },
+  {
+    "name": "Hasselblad H5D-60/H4D-60",
+    "width": 53.7,
+    "height": 40.2,
+    "diagonal": 67.2
+  }
+]
