@@ -89,13 +89,15 @@ struct CameraView: View {
                 // Crop marks overlay
                 CropMarksOverlay(
                     // MODIFIED: Pass dimensions instead of filmFormat struct
+                    capturePlane: currentGearData.capturePlane,
                     capturePlaneWidth: currentGearData.capturePlaneWidth,
                     capturePlaneHeight: currentGearData.capturePlaneHeight,
                     capturePlaneDiagonal: currentGearData.capturePlaneDiagonal,
                     selectedFocalLength: selectedFocalLength,
                     currentCameraFocalLength: effectiveFocalLength,
                     isVisible: showCropMarks,
-                    isZoomLens: isZoomLensActive
+                    isZoomLens: isZoomLensActive,
+                    actualDiagonalFOV: camera.actualDiagonalFOV  // NEW: Pass actual FOV
                 )
                 .allowsHitTesting(false)
 
@@ -322,6 +324,8 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
     // MODIFICATION: Renamed back to physicalFocalLength as it now holds the actual mm value.
     // ----------------------------------------------------------------------------------
     @Published var physicalFocalLength: CGFloat = 0.0
+    @Published var actualDiagonalFOV: CGFloat = 0.0  // Actual diagonal FOV in radians
+    @Published var calibrationData: AVCameraCalibrationData?  // NEW: Calibration data from camera
     
     var isSimulator: Bool {
         #if targetEnvironment(simulator)
@@ -335,6 +339,8 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
     
     let session = AVCaptureSession()
     private var photoOutput = AVCapturePhotoOutput()
+    private var videoDataOutput = AVCaptureVideoDataOutput()  // NEW: For calibration data
+    private var videoDataOutputQueue = DispatchQueue(label: "com.photoAssistant.videoDataOutput")  // NEW
     private var currentInput: AVCaptureDeviceInput?
     private var currentDevice: AVCaptureDevice?
     public var baseZoomFactor: CGFloat = 1.0
@@ -569,6 +575,14 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
             print("Cannot add photo output to session")
         }
         
+        // NEW: Add video data output to capture calibration data
+        if session.canAddOutput(videoDataOutput) {
+            session.addOutput(videoDataOutput)
+            videoDataOutput.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
+        } else {
+            print("Cannot add video data output to session")
+        }
+        
         session.commitConfiguration()
         
         self.session.startRunning()
@@ -578,6 +592,17 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
         // ----------------------------------------------------------------------------------
         DispatchQueue.main.async {
             self.physicalFocalLength = selectedCamera.activeFormat.approx35mmFocalLength
+            // NEW: Capture the actual diagonal FOV in radians
+            let fovDegrees = CGFloat(selectedCamera.activeFormat.videoFieldOfView)
+            self.actualDiagonalFOV = fovDegrees * .pi / 180.0
+            
+            #if DEBUG
+            print("📸 Camera Configuration:")
+            print("  Device: \(selectedCamera.localizedName)")
+            print("  35mm equiv focal length: \(selectedCamera.activeFormat.approx35mmFocalLength)mm")
+            print("  videoFieldOfView: \(selectedCamera.activeFormat.videoFieldOfView)°")
+            print("  actualDiagonalFOV: \(self.actualDiagonalFOV * 180 / .pi)°")
+            #endif
         }
     }
     
@@ -774,6 +799,29 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
                         self.currentZoom = zoom
                         self.baseZoomFactor = targetZoomFactor
                         self.physicalFocalLength = targetCamera.activeFormat.approx35mmFocalLength
+                        
+                        // NEW: Update the actual diagonal FOV, accounting for digital zoom
+                        let baseFovDegrees = CGFloat(targetCamera.activeFormat.videoFieldOfView)
+                        
+                        // When using digital zoom, the effective FOV is narrower
+                        // FOV' = 2 * arctan(tan(FOV/2) / zoomFactor)
+                        if targetZoomFactor > 1.0 {
+                            let baseFovRadians = baseFovDegrees * .pi / 180.0
+                            let effectiveFovRadians = 2.0 * atan(tan(baseFovRadians / 2.0) / targetZoomFactor)
+                            self.actualDiagonalFOV = effectiveFovRadians
+                        } else {
+                            // No digital zoom, use the native FOV
+                            self.actualDiagonalFOV = baseFovDegrees * .pi / 180.0
+                        }
+                        
+                        #if DEBUG
+                        print("📸 Switched to \(zoom)x camera:")
+                        print("  Device: \(targetCamera.localizedName)")
+                        print("  35mm equiv: \(targetCamera.activeFormat.approx35mmFocalLength)mm")
+                        print("  videoFieldOfView (base): \(targetCamera.activeFormat.videoFieldOfView)°")
+                        print("  Digital zoom factor: \(targetZoomFactor)x")
+                        print("  Effective diagonal FOV: \(self.actualDiagonalFOV * 180 / .pi)°")
+                        #endif
                     }
                 } catch {
                     print("Error setting zoom: \(error)")
@@ -797,6 +845,9 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
                     // Update currentZoom to reflect actual zoom for button highlighting
                     self.currentZoom = clampedZoom
                     self.physicalFocalLength = device.activeFormat.approx35mmFocalLength
+                    // NEW: Update the actual diagonal FOV
+                    let fovDegrees = CGFloat(device.activeFormat.videoFieldOfView)
+                    self.actualDiagonalFOV = fovDegrees * .pi / 180.0
                 }
             } catch {
                 print("Error handling pinch zoom: \(error)")
@@ -895,6 +946,9 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
                 // Update focal length for new camera
                 if let selectedCamera = self.currentDevice {
                     self.physicalFocalLength = selectedCamera.activeFormat.approx35mmFocalLength
+                    // NEW: Update the actual diagonal FOV
+                    let fovDegrees = CGFloat(selectedCamera.activeFormat.videoFieldOfView)
+                    self.actualDiagonalFOV = fovDegrees * .pi / 180.0
                 }
                 
                 // Re-detect available zoom levels for the new camera position
@@ -955,15 +1009,15 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
     private func exifOrientationFromDeviceOrientation() -> Int {
         switch deviceOrientation {
         case .portrait:
-            return 6
+            return 6  // Right, top
         case .portraitUpsideDown:
-            return 8
+            return 8  // Left, bottom
         case .landscapeLeft:
-            return 3
+            return 1  // Up, left
         case .landscapeRight:
-            return 1
+            return 3  // Down, right
         default:
-            return 6
+            return 6  // Default to portrait
         }
     }
     
@@ -1071,6 +1125,99 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
             sessionQueue.sync {
                 self.session.stopRunning()
             }
+        }
+    }
+}
+
+// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
+
+extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
+    func captureOutput(_ output: AVCaptureOutput,
+                      didOutput sampleBuffer: CMSampleBuffer,
+                      from connection: AVCaptureConnection) {
+        // Extract calibration data from the sample buffer
+        // This is available in the attachments of the sample buffer
+        guard let attachments = CMCopyDictionaryOfAttachments(
+            allocator: kCFAllocatorDefault,
+            target: sampleBuffer,
+            attachmentMode: kCMAttachmentMode_ShouldPropagate
+        ) as? [String: Any] else {
+            return
+        }
+        
+        // Look for the camera intrinsic matrix attachment
+        // Note: The key is "CameraIntrinsicMatrix" in the attachments
+        if let intrinsicMatrixData = attachments["CameraIntrinsicMatrix"] as? Data {
+            // Parse the intrinsic matrix (it's a 3x3 matrix as CFData)
+            intrinsicMatrixData.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
+                if let baseAddress = ptr.baseAddress, ptr.count >= MemoryLayout<Float>.size * 9 {
+                    let matrixPtr = baseAddress.assumingMemoryBound(to: Float.self)
+                    
+                    // The matrix is stored in column-major order
+                    // [ fx  0  cx ]
+                    // [ 0  fy  cy ]
+                    // [ 0   0   1 ]
+                    let fx = CGFloat(matrixPtr[0])
+                    let fy = CGFloat(matrixPtr[4])
+                    let cx = CGFloat(matrixPtr[2])
+                    let cy = CGFloat(matrixPtr[5])
+                    
+                    // Get the reference dimensions from the format description
+                    if let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) {
+                        let dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
+                        let width = CGFloat(dimensions.width)
+                        let height = CGFloat(dimensions.height)
+                        
+                        // Sanity check: fx and fy should be positive and reasonable
+                        guard fx > 0, fy > 0, fx < width * 2, fy < height * 2 else {
+                            return  // Invalid calibration data
+                        }
+                        
+                        // Calculate the diagonal FOV from intrinsics
+                        let diagonalPixels = sqrt(width * width + height * height)
+                        let diagonalFocalLength = sqrt(fx * fx + fy * fy)
+                        let diagonalFOV = 2 * atan(diagonalPixels / (2 * diagonalFocalLength))
+                        
+                        // Sanity check: FOV should be between 10° and 180°
+                        let fovDegrees = diagonalFOV * 180 / .pi
+                        guard fovDegrees > 10, fovDegrees < 180 else {
+                            return  // Invalid FOV
+                        }
+                        
+                        // DEBUG: Print calibration data (throttled to avoid spam)
+                        #if DEBUG
+                        struct ThrottleState {
+                            static var lastPrintTime: TimeInterval = 0
+                        }
+                        let now = Date().timeIntervalSince1970
+                        if now - ThrottleState.lastPrintTime > 2.0 {  // Print every 2 seconds
+                            print("📐 Calibration Data from Intrinsic Matrix:")
+                            print("  fx=\(String(format: "%.1f", fx)), fy=\(String(format: "%.1f", fy)), cx=\(String(format: "%.1f", cx)), cy=\(String(format: "%.1f", cy))")
+                            print("  Dimensions: \(Int(width))×\(Int(height))")
+                            print("  Diagonal FOV: \(String(format: "%.2f", fovDegrees))°")
+                            ThrottleState.lastPrintTime = now
+                        }
+                        #endif
+                        
+                        DispatchQueue.main.async {
+                            self.actualDiagonalFOV = diagonalFOV
+                        }
+                    }
+                }
+            }
+        } else {
+            // If intrinsic matrix not available, we rely on the videoFieldOfView fallback
+            // which was already set during camera configuration
+            #if DEBUG
+            struct NoCalibThrottle {
+                static var lastPrintTime: TimeInterval = 0
+            }
+            let now = Date().timeIntervalSince1970
+            if now - NoCalibThrottle.lastPrintTime > 5.0 {  // Print every 5 seconds
+                print("⚠️ No intrinsic matrix found, using videoFieldOfView fallback: \(String(format: "%.2f", self.actualDiagonalFOV * 180 / .pi))°")
+                NoCalibThrottle.lastPrintTime = now
+            }
+            #endif
         }
     }
 }
@@ -1219,6 +1366,7 @@ struct ZoomLens: Identifiable, Equatable {
 
 struct CropMarksOverlay: View {
     // MODIFIED: Accepts individual capture plane dimensions instead of a FilmFormat struct
+    let capturePlane: String
     let capturePlaneWidth: Double
     let capturePlaneHeight: Double
     let capturePlaneDiagonal: Double
@@ -1227,6 +1375,7 @@ struct CropMarksOverlay: View {
     let currentCameraFocalLength: Int
     let isVisible: Bool
     let isZoomLens: Bool
+    let actualDiagonalFOV: CGFloat  // NEW: Actual diagonal FOV in radians from the iPhone camera
     // MODIFIED: Use a property to hold the default range for visualization
     let defaultZoomRange: (min: Int, max: Int) = (35, 75)
     
@@ -1234,6 +1383,7 @@ struct CropMarksOverlay: View {
         if isVisible {
             GeometryReader { geometry in
                 let cropFrame = calculateCropFrame(
+                    capturePlane: capturePlane,
                     for: selectedFocalLength,
                     cameraFocalLength: currentCameraFocalLength,
                     // MODIFIED: Pass dimensions
@@ -1312,6 +1462,7 @@ struct CropMarksOverlay: View {
     
     private func zoomRangeVisualization(geometry: GeometryProxy) -> some View {
         let minCropFrame = calculateCropFrame(
+            capturePlane: capturePlane,
             for: defaultZoomRange.min, // MODIFIED: Use defaultZoomRange
             cameraFocalLength: currentCameraFocalLength,
             capturePlaneWidth: capturePlaneWidth, // NEW
@@ -1321,6 +1472,7 @@ struct CropMarksOverlay: View {
         )
         
         let maxCropFrame = calculateCropFrame(
+            capturePlane: capturePlane,
             for: defaultZoomRange.max, // MODIFIED: Use defaultZoomRange
             cameraFocalLength: currentCameraFocalLength,
             capturePlaneWidth: capturePlaneWidth, // NEW
@@ -1419,73 +1571,151 @@ struct CropMarksOverlay: View {
             .frame(width: 4, height: 4)
             .position(x: x, y: y)
     }
-
+    
     // MODIFIED: Function signature updated to use dynamic dimensions
-    private func calculateCropFrame(
+    func calculateCropFrame(
+        capturePlane: String,
         for focalLength: Int,
         cameraFocalLength: Int,
-        capturePlaneWidth: Double, // NEW: Used as FilmFormat.width
-        capturePlaneHeight: Double, // NEW
-        capturePlaneDiagonal: Double, // NEW
+        capturePlaneWidth: Double,
+        capturePlaneHeight: Double,
+        capturePlaneDiagonal: Double,
         in screenSize: CGSize
     ) -> (width: CGFloat, height: CGFloat, isVisible: Bool) {
-                
-        // 1. Define physical dimensions
-        // MODIFIED: Use the longer dimension for captureFrameWidth
-        let captureFrameWidth: Double = capturePlaneWidth > capturePlaneHeight ? capturePlaneWidth : capturePlaneHeight
-        let thirtyFiveMmFilmWidth: Double = 36.0  // Standard 35mm film width
         
-        // 2. Empirical Calibration Factor
-        //let previewLayerCalibrationFactor: Double = 100.0 / captureFrameWidth
-        //let previewLayerCalibrationFactor: Double = captureFrameWidth / 36.0
-        //let previewLayerCalibrationFactor: Double = 0.8 // ** for 6x6cm from the 500c
-        //let previewLayerCalibrationFactor: Double = 1.4 // ** for 43.8x32.9 from the X2D
+        // Basic sanity checks
+        guard focalLength > 0,
+              cameraFocalLength > 0,
+              capturePlaneWidth > 0,
+              capturePlaneHeight > 0,
+              screenSize.width > 0,
+              screenSize.height > 0
+        else {
+            return (width: 0, height: 0, isVisible: false)
+        }
         
-        // Using a linear relationship between the width of the sensor (capturePlaneWidth) and the
-        // required calibration factor. Coefficients derived from 6x6 (0.8) and X2D (1.4) data points
-        let slope: Double = -0.037037
-        let intercept: Double = 3.02222
-        let previewLayerCalibrationFactor: Double = (slope * captureFrameWidth) + intercept
-        
-        // Convert focal lengths to Double -- Keep These
+        // 1. Physical / optical parameters
         let selectedFocalDouble = Double(focalLength)
-        let cameraFocalDouble = Double(cameraFocalLength)
-
-        // 3. Calculate the FOV for the SIMULATED LENS (using physical captureFrameWidth)
-        let simulatedCaptureFrameFovRadians = 2 * atan(captureFrameWidth / (2 * selectedFocalDouble))
-
-        // 4. Calculate the FOV for the ACTIVE IPHONE CAMERA (using 36.0mm reference)
-        let activeiPhoneCameraFovRadians = 2 * atan(thirtyFiveMmFilmWidth / (2 * cameraFocalDouble))
-
-        // 5. Determine the base geometric scaling factor
-        let baseScaleFactor = tan(simulatedCaptureFrameFovRadians / 2) / tan(activeiPhoneCameraFovRadians / 2)
+        let cameraFocalDouble   = Double(cameraFocalLength)
         
-        // 6. Apply the empirical calibration to the scale factor
-        let calibratedScaleFactor = baseScaleFactor * previewLayerCalibrationFactor
+        // Use the provided capturePlaneDiagonal if valid, otherwise compute it
+        let captureDiagonal: Double
+        if capturePlaneDiagonal > 0 {
+            captureDiagonal = capturePlaneDiagonal
+        } else {
+            captureDiagonal = sqrt(capturePlaneWidth * capturePlaneWidth +
+                                   capturePlaneHeight * capturePlaneHeight)
+        }
         
-        // 7. Calculate the crop frame size
-        let baseCropWidth = screenSize.width * calibratedScaleFactor
+        // 2. Determine which capture plane dimension to use based on screen orientation
+        // In portrait: screen width is short, so use short capture dimension
+        // In landscape: screen width is long, so use long capture dimension
+        let isPortrait = screenSize.width < screenSize.height
         
-        // MODIFIED: Use short dimension for horizontal (width), long dimension for vertical (height)
-        let shortDimension = min(capturePlaneWidth, capturePlaneHeight)
-        let longDimension = max(capturePlaneWidth, capturePlaneHeight)
+        let captureHorizontalDimension: Double
+        let captureVerticalDimension: Double
         
-        let cropWidth = baseCropWidth * CGFloat(shortDimension / captureFrameWidth)
-        let cropHeight = baseCropWidth * CGFloat(longDimension / captureFrameWidth)
-
-        // 8. Determine visibility and clamp dimensions
-        let minCropDisplaySize: CGFloat = 50
-        let maxCropDisplayRatio: CGFloat = 1.0
-
-        // Check if the crop is valid (large enough to see) and not excessively large
-        let isVisible = (cropWidth >= minCropDisplaySize && cropHeight >= minCropDisplaySize) &&
-                        (cropWidth <= screenSize.width * maxCropDisplayRatio && cropHeight <= screenSize.height * maxCropDisplayRatio)
+        if isPortrait {
+            // Portrait: width is short dimension
+            captureHorizontalDimension = min(capturePlaneWidth, capturePlaneHeight)
+            captureVerticalDimension = max(capturePlaneWidth, capturePlaneHeight)
+        } else {
+            // Landscape: width is long dimension
+            captureHorizontalDimension = max(capturePlaneWidth, capturePlaneHeight)
+            captureVerticalDimension = min(capturePlaneWidth, capturePlaneHeight)
+        }
         
-        // Clamp the display size to prevent it from exceeding the screen's bounds
-        let displayWidth = min(cropWidth, screenSize.width)
-        let displayHeight = min(cropHeight, screenSize.height)
+        // Calculate FOV based on the horizontal dimension (what actually matters for framing)
+        let simulatedHorizontalFovRadians = 2 * atan(captureHorizontalDimension / (2 * selectedFocalDouble))
         
-        return (width: displayWidth, height: displayHeight, isVisible: isVisible)
+        // Use the iPhone's diagonal FOV (this doesn't change with orientation)
+        let iPhoneFovRadians = Double(actualDiagonalFOV)  // Already in radians from videoFieldOfView
+        
+        #if DEBUG
+        // Log the actual FOV values being used for all cameras
+        print("🔍 FOV Calculation for \(capturePlane) / \(focalLength)mm:")
+        print("  Screen orientation: \(isPortrait ? "Portrait" : "Landscape")")
+        print("  Capture horizontal dimension: \(captureHorizontalDimension)mm")
+        print("  Capture vertical dimension: \(captureVerticalDimension)mm")
+        print("  actualDiagonalFOV (iPhone, radians): \(actualDiagonalFOV)")
+        print("  actualDiagonalFOV (iPhone, degrees): \(actualDiagonalFOV * 180 / .pi)")
+        print("  simulatedHorizontalFov (radians): \(simulatedHorizontalFovRadians)")
+        print("  simulatedHorizontalFov (degrees): \(simulatedHorizontalFovRadians * 180 / .pi)")
+        print("  screenSize: \(screenSize)")
+        #endif
+        
+        let simTan   = tan(simulatedHorizontalFovRadians / 2)
+        let iphoneTan = tan(iPhoneFovRadians / 2)
+        
+        guard simTan > 0, iphoneTan > 0 else {
+            return (width: 0, height: 0, isVisible: false)
+        }
+        
+        // 3. Geometric scale factor between FOVs
+        // > 1  => simulated camera has wider FOV than iPhone (larger crop frame)
+        // < 1  => simulated camera has narrower FOV (smaller crop frame)
+        let baseScaleFactor = simTan / iphoneTan
+        
+        // 4. Use the *short* side of the preview as the base dimension
+        let previewShort = min(screenSize.width, screenSize.height)
+        let previewLong  = max(screenSize.width, screenSize.height)
+        
+        // 5. Capture frame aspect ratio (long / short)
+        let shortCapture = min(capturePlaneWidth, capturePlaneHeight)
+        let longCapture  = max(capturePlaneWidth, capturePlaneHeight)
+        let aspectRatio  = longCapture / shortCapture  // ≥ 1
+        
+        // Map diagonal FOV ratio onto the short dimension in screen space
+        var cropShort = previewShort * CGFloat(baseScaleFactor)
+        var cropLong  = cropShort * CGFloat(aspectRatio)
+        
+        // --- DEBUG: log effective capture plane for 6x6 + 80mm only ---
+        
+#if DEBUG
+        let testingDistanceInInches: Double = 36  // 3 feet
+        
+        logEffectiveCapturePlaneWithDistance(
+            cropShort: cropShort,
+            previewShort: previewShort,
+            focalLength: focalLength,
+            distanceInInches: testingDistanceInInches,
+            cameraFocalLength: cameraFocalLength,
+            capturePlaneName: capturePlane,
+            configuredWidth: capturePlaneWidth,
+            configuredHeight: capturePlaneHeight,
+            configuredDiagonal: capturePlaneDiagonal
+        )
+#endif
+        // --- END DEBUG ---
+        
+        // 6. Visibility / clamping
+        let minCropDisplaySize: CGFloat  = 50.0
+        let maxCropDisplayRatio: CGFloat = 1.0   // don’t let crop exceed preview bounds
+        
+        let isVisibleRaw =
+        cropShort >= minCropDisplaySize &&
+        cropLong  >= minCropDisplaySize &&
+        cropShort <= previewShort * maxCropDisplayRatio &&
+        cropLong  <= previewLong  * maxCropDisplayRatio
+        
+        // Clamp to the actual preview bounds
+        cropShort = min(cropShort, previewShort)
+        cropLong  = min(cropLong,  previewLong)
+        
+        // 7. Orient width/height so short ↔ short
+        let width: CGFloat
+        let height: CGFloat
+        if screenSize.width <= screenSize.height {
+            // Portrait: width = short side, height = long side
+            width  = cropShort
+            height = cropLong
+        } else {
+            // Landscape: width = long side, height = short side
+            width  = cropLong
+            height = cropShort
+        }
+        
+        return (width: width, height: height, isVisible: isVisibleRaw)
     }
     
     private func cornerMark(at corner: CornerPosition, in cropFrame: (width: CGFloat, height: CGFloat, isVisible: Bool), geometry: GeometryProxy, isVisible: Bool) -> some View {
@@ -1553,6 +1783,139 @@ struct CropMarksOverlay: View {
             }
         }
         .position(x: x, y: y)
+    }
+    
+    private func logEffectiveCapturePlaneWithDistance(
+        cropShort: CGFloat,
+        previewShort: CGFloat,
+        focalLength: Int,
+        distanceInInches: Double,
+        cameraFocalLength: Int,
+        capturePlaneName: String,
+        configuredWidth: Double,
+        configuredHeight: Double,
+        configuredDiagonal: Double
+    ) {
+        guard cropShort > 0,
+              previewShort > 0,
+              focalLength > 0,
+              cameraFocalLength > 0,
+              distanceInInches > 0 else {
+            print("🔍 [\(capturePlaneName)] Debug: invalid inputs.")
+            return
+        }
+        
+        // Convert distance to mm
+        let distanceMM = distanceInInches * 25.4
+        
+        // Ratio between overlay short side and preview short side
+        let ratio = Double(cropShort / previewShort)
+        
+        // iPhone diagonal FOV - USE THE ACTUAL FOV from actualDiagonalFOV
+        let iphoneFovDiag = Double(actualDiagonalFOV)  // Already in radians
+        let iphoneTan = tan(iphoneFovDiag / 2.0)
+        
+        // Simulated FOV (diagonal) inferred from crop ratio
+        let simTan = ratio * iphoneTan
+        let simFovDiag = 2.0 * atan(simTan)
+        
+        // Effective diagonal from FOV + focal length
+        let fSim = Double(focalLength)
+        let effectiveDiagonal = 2.0 * fSim * tan(simFovDiag / 2.0)
+        
+        // Actual configured diagonal
+        let cfgDiag = configuredDiagonal > 0
+            ? configuredDiagonal
+            : hypot(configuredWidth, configuredHeight)
+        
+        let scale = effectiveDiagonal / cfgDiag
+        let effectiveWidthMM  = configuredWidth  * scale
+        let effectiveHeightMM = configuredHeight * scale
+        
+        // Convert mm → inches
+        let effWidthIn   = mmToInches(effectiveWidthMM)
+        let effHeightIn  = mmToInches(effectiveHeightMM)
+        let effDiagIn    = mmToInches(effectiveDiagonal)
+        
+        let cfgWidthIn   = mmToInches(configuredWidth)
+        let cfgHeightIn  = mmToInches(configuredHeight)
+        let cfgDiagIn    = mmToInches(cfgDiag)
+        
+        // Expected physical HORIZONTAL & VERTICAL field at this distance
+        // For a square 6x6 format, width = height, so we calculate based on width
+        //
+        // HFOVw = 2 * atan( (sensorWidth / 2)  / f )
+        let hfovWidth  = 2.0 * atan((configuredWidth  / 2.0) / fSim)
+        let hfovHeight = 2.0 * atan((configuredHeight / 2.0) / fSim)
+        
+        let expectedWidthMM  = 2.0 * distanceMM * tan(hfovWidth  / 2.0)
+        let expectedHeightMM = 2.0 * distanceMM * tan(hfovHeight / 2.0)
+        
+        let expectedWidthIn  = mmToInches(expectedWidthMM)
+        let expectedHeightIn = mmToInches(expectedHeightMM)
+        
+        // Also calculate diagonal field for reference
+        let diagonalFOV = 2.0 * atan(cfgDiag / (2.0 * fSim))
+        let expectedDiagonalMM = 2.0 * distanceMM * tan(diagonalFOV / 2.0)
+        let expectedDiagonalIn = mmToInches(expectedDiagonalMM)
+        
+        // Observed horizontal & vertical field (from effective size)
+        let effHfovWidth  = 2.0 * atan((effectiveWidthMM  / 2.0) / fSim)
+        let effHfovHeight = 2.0 * atan((effectiveHeightMM / 2.0) / fSim)
+        
+        let observedWidthMM  = 2.0 * distanceMM * tan(effHfovWidth  / 2.0)
+        let observedHeightMM = 2.0 * distanceMM * tan(effHfovHeight / 2.0)
+        
+        let observedWidthIn  = mmToInches(observedWidthMM)
+        let observedHeightIn = mmToInches(observedHeightMM)
+        
+        print("""
+        
+        📷 DEBUG: \(capturePlaneName) with \(focalLength)mm at \(distanceInInches) inches
+        ------------------------------------------------------------
+        
+        CONFIGURED CAPTURE PLANE:
+          width   = \(configuredWidth) mm  (\(formatInches(cfgWidthIn)))
+          height  = \(configuredHeight) mm (\(formatInches(cfgHeightIn)))
+          diagonal= \(cfgDiag) mm          (\(formatInches(cfgDiagIn)))
+        
+        EFFECTIVE (from overlay at this distance):
+          eff width   = \(effectiveWidthMM) mm  (\(formatInches(effWidthIn)), \(formatFeetInches(effWidthIn)))
+          eff height  = \(effectiveHeightMM) mm (\(formatInches(effHeightIn)), \(formatFeetInches(effHeightIn)))
+          eff diagonal= \(effectiveDiagonal) mm (\(formatInches(effDiagIn)))
+        
+        FIELD AT DISTANCE \(distanceInInches) in (\(distanceMM) mm):
+          Horizontal width  = \(formatInches(expectedWidthIn))  (\(formatFeetInches(expectedWidthIn)))
+          Vertical height   = \(formatInches(expectedHeightIn)) (\(formatFeetInches(expectedHeightIn)))
+          Diagonal distance = \(formatInches(expectedDiagonalIn)) (\(formatFeetInches(expectedDiagonalIn)))
+        
+        FOV ANGLES:
+          Horizontal FOV = \((hfovWidth * 180.0 / .pi))°
+          Vertical FOV   = \((hfovHeight * 180.0 / .pi))°
+          Diagonal FOV   = \((diagonalFOV * 180.0 / .pi))°
+        
+        CROP MARKS:
+          ratio cropShort/previewShort = \(ratio)
+          iPhone FOV diag (deg)        = \((iphoneFovDiag * 180.0 / .pi))
+          Film FOV diag (deg)          = \((diagonalFOV * 180.0 / .pi))
+        
+        ------------------------------------------------------------
+        """)
+    }
+
+    
+    private func mmToInches(_ mm: Double) -> Double {
+        mm / 25.4
+    }
+
+    private func formatInches(_ inches: Double) -> String {
+        String(format: "%.2f in", inches)
+    }
+
+    private func formatFeetInches(_ inches: Double) -> String {
+        let feet = Int(inches / 12.0)
+        let leftover = inches - Double(feet) * 12.0
+        return String(format: "%d ft %.2f in", feet, leftover)
     }
 }
 
@@ -1826,6 +2189,7 @@ struct CropMarksControlPanel: View {
             }
             
             formatInfoView
+
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -1857,4 +2221,3 @@ struct CropMarksControlPanel: View {
         return fovRadians * 180 / .pi // Convert to degrees
     }
 }
-

@@ -124,5 +124,30 @@
     "width": 53.7,
     "height": 40.2,
     "diagonal": 67.2
+  },
+  {
+    "name": "Medium Format 6x12cm",
+    "width": 60.0,
+    "height": 120.0,
+    "diagonal": 134.16
+  },
+  {
+    "name": "Medium Format 6x17cm",
+    "width": 60.0,
+    "height": 170.0,
+    "diagonal": 180.28
+  },
+  {
+    "name": "Large Format 5x7",
+    "width": 127.0,
+    "height": 177.8,
+    "diagonal": 218.50
+  },
+  {
+    "name": "Phase One IQ4 150MP",
+    "width": 53.4,
+    "height": 40.0,
+    "diagonal": 66.72
   }
 ]
+
