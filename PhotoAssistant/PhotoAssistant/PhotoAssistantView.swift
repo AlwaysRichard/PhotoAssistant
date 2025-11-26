@@ -4,7 +4,7 @@ struct PhotoAssistantView: View {
     @State private var selection: Selection?
     
     enum Selection {
-        case camera, gear
+        case camera, gear, calibration
     }
     
     var body: some View {
@@ -30,6 +30,14 @@ struct PhotoAssistantView: View {
                         .background(Color.accentColor.opacity(0.2))
                         .cornerRadius(12)
                 }
+                Button(action: { selection = .calibration }) {
+                    Label("Calibrate Camera", systemImage: "slider.horizontal.3")
+                        .font(.title2)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.orange.opacity(0.2))
+                        .cornerRadius(12)
+                }
                 Spacer()
             }
             .padding()
@@ -39,6 +47,10 @@ struct PhotoAssistantView: View {
             )
             .background(
                 NavigationLink(destination: MyGearListView(), tag: .gear, selection: $selection) { EmptyView() }
+                    .hidden()
+            )
+            .background(
+                NavigationLink(destination: CameraCalibrationView(), tag: .calibration, selection: $selection) { EmptyView() }
                     .hidden()
             )
         }

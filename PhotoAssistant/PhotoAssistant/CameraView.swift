@@ -37,6 +37,15 @@ struct CameraView: View {
     @State private var gearList: [MyGearModel] = MyGearModel.loadGearList()
     @State private var selectedGear: MyGearModel?
     
+    // CALIBRATION MODE: Parameters passed from calibration flow
+    var isCalibrationMode: Bool = false
+    var calibrationCapturePlane: String = ""
+    var calibrationWidth: Double = 0
+    var calibrationHeight: Double = 0
+    var calibrationDiagonal: Double = 0
+    var calibrationFocalLength: Int = 0
+    var calibrationZoom: CGFloat = 1.0
+    
     // NEW: Computed property for the currently selected gear's data
     private var currentGearData: MyGearModel {
         // Fallback logic for when selectedGear is nil (e.g., initial load or empty list)
@@ -97,7 +106,8 @@ struct CameraView: View {
                     currentCameraFocalLength: effectiveFocalLength,
                     isVisible: showCropMarks,
                     isZoomLens: isZoomLensActive,
-                    actualDiagonalFOV: camera.actualDiagonalFOV  // NEW: Pass actual FOV
+                    actualDiagonalFOV: camera.actualDiagonalFOV,  // Pass actual FOV
+                    currentZoomFactor: camera.currentZoom  // FIXED: Use currentZoom (user-facing 0.5x, 1x, 2x) not baseZoomFactor
                 )
                 .allowsHitTesting(false)
 
@@ -134,71 +144,77 @@ struct CameraView: View {
                     }
                     .padding(.bottom, 8)
                     
-                    HStack(spacing: 15) {
-                        ForEach(camera.availableZoomLevels, id: \.self) { zoom in
-                            Button(action: {
-                                // Correct call syntax for the @StateObject's object
-                                camera.switchInternalCamera(zoom)
-                            }) {
-                                Text(zoom < 1 ? ".5x" : "\(Int(zoom))x")
-                                    .font(.system(size: 16, weight: camera.getClosestZoomLevel() == zoom ? .bold : .regular))
-                                    .foregroundColor(camera.getClosestZoomLevel() == zoom ? .yellow : .white)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(camera.getClosestZoomLevel() == zoom ? Color.white.opacity(0.3) : Color.clear)
-                                    .cornerRadius(15)
+                    // Zoom lens buttons - HIDE in calibration mode
+                    if !isCalibrationMode {
+                        HStack(spacing: 15) {
+                            ForEach(camera.availableZoomLevels, id: \.self) { zoom in
+                                Button(action: {
+                                    // Correct call syntax for the @StateObject's object
+                                    camera.switchInternalCamera(zoom)
+                                }) {
+                                    Text(zoom < 1 ? ".5x" : "\(Int(zoom))x")
+                                        .font(.system(size: 16, weight: camera.getClosestZoomLevel() == zoom ? .bold : .regular))
+                                        .foregroundColor(camera.getClosestZoomLevel() == zoom ? .yellow : .white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(camera.getClosestZoomLevel() == zoom ? Color.white.opacity(0.3) : Color.clear)
+                                        .cornerRadius(15)
+                                }
+                                .disabled(camera.isCapturing)
                             }
-                            .disabled(camera.isCapturing)
                         }
+                        .padding(.bottom, 12)
                     }
-                    .padding(.bottom, 12)
 
                     // ----------------------------------------------------------------------------------
                     // MODIFICATION: Centering Shutter and Positioning Switch Button
+                    // HIDE in calibration mode - calibration workflow provides its own shutter
                     // ----------------------------------------------------------------------------------
-                    HStack(spacing: 0) {
-                        Spacer() // Pushes controls to the center
+                    if !isCalibrationMode {
+                        HStack(spacing: 0) {
+                            Spacer() // Pushes controls to the center
 
-                        // 1. Switch Camera Button (just to the left of the Shutter)
-                        Button(action: {
-                            camera.switchCamera()
-                        }) {
-                            Image(systemName: "arrow.triangle.2.circlepath.camera")
-                                .font(.system(size: 28))
-                                .foregroundColor(.white)
-                                .frame(width: 50, height: 50)
-                        }
-                        .padding(.trailing, 25) // Reduced padding for closer placement
-                        .disabled(camera.isCapturing)
+                            // 1. Switch Camera Button (just to the left of the Shutter)
+                            Button(action: {
+                                camera.switchCamera()
+                            }) {
+                                Image(systemName: "arrow.triangle.2.circlepath.camera")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 50)
+                            }
+                            .padding(.trailing, 25) // Reduced padding for closer placement
+                            .disabled(camera.isCapturing)
 
-                        // 2. Capture Photo Button (Shutter - Centered)
-                        Button(action: {
-                            camera.capturePhoto()
-                        }) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(camera.isCapturing ? 0.5 : 1.0))
-                                    .frame(width: 70, height: 70)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white, lineWidth: 3)
-                                            .frame(width: 80, height: 80)
-                                    )
-                                if camera.isCapturing {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .gray))
-                                        .scaleEffect(1.2)
+                            // 2. Capture Photo Button (Shutter - Centered)
+                            Button(action: {
+                                camera.capturePhoto()
+                            }) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(camera.isCapturing ? 0.5 : 1.0))
+                                        .frame(width: 70, height: 70)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 3)
+                                                .frame(width: 80, height: 80)
+                                        )
+                                    if camera.isCapturing {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                            .scaleEffect(1.2)
+                                    }
                                 }
                             }
+                            .disabled(camera.isCapturing)
+                            
+                            // 3. Placeholder (Invisible View) to balance the width of the Switch button and its padding (50+25=75)
+                            Color.clear.frame(width: 50 + 25, height: 1)
+                            
+                            Spacer()
                         }
-                        .disabled(camera.isCapturing)
-                        
-                        // 3. Placeholder (Invisible View) to balance the width of the Switch button and its padding (50+25=75)
-                        Color.clear.frame(width: 50 + 25, height: 1)
-                        
-                        Spacer()
+                        .padding(.bottom, 50)
                     }
-                    .padding(.bottom, 50)
                 }
             } else {
                 Color.black.ignoresSafeArea()
@@ -259,33 +275,60 @@ struct CameraView: View {
             }
         }
         // MODIFIED: Toolbar button only toggles the control panel visibility.
+        // HIDE in calibration mode
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showCropMarksControlPanel.toggle()
-                        
-                        // REMOVED: Logic to turn off crop marks when panel closes.
-                        // Now, crop marks only hide when the user taps the active lens button inside the panel.
+            if !isCalibrationMode {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showCropMarksControlPanel.toggle()
+                            
+                            // REMOVED: Logic to turn off crop marks when panel closes.
+                            // Now, crop marks only hide when the user taps the active lens button inside the panel.
+                        }
+                    }) {
+                        Image(systemName: "camera.viewfinder")
+                            .font(.system(size: 20))
+                            .foregroundColor(.black)
+                            .frame(width: 40, height: 40)
+                            .background(Color.white.opacity(1.0))
+                            .clipShape(Circle())
                     }
-                }) {
-                    Image(systemName: "camera.viewfinder")
-                        .font(.system(size: 20))
-                        .foregroundColor(.black)
-                        .frame(width: 40, height: 40)
-                        .background(Color.white.opacity(1.0))
-                        .clipShape(Circle())
                 }
             }
         }
         .onAppear {
             camera.setModelContext(modelContext)
             
-            // NEW: Set the initial selected gear if it exists
-            if selectedGear == nil, let firstGear = gearList.first {
-                selectedGear = firstGear
-                // Also set the initial focal length from the first available prime lens, or 80mm default
-                selectedFocalLength = firstGear.lenses.first(where: { $0.type == .prime })?.primeFocalLength ?? 80
+            // CALIBRATION MODE: Setup if in calibration mode
+            if isCalibrationMode {
+                // Create a temporary gear model with calibration parameters
+                let calibrationGear = MyGearModel(
+                    cameraName: calibrationCapturePlane,
+                    capturePlane: calibrationCapturePlane,
+                    capturePlaneWidth: calibrationWidth,
+                    capturePlaneHeight: calibrationHeight,
+                    capturePlaneDiagonal: calibrationDiagonal,
+                    lenses: [Lens(name: "\(calibrationFocalLength)mm", type: .prime, primeFocalLength: calibrationFocalLength)]
+                )
+                selectedGear = calibrationGear
+                selectedFocalLength = calibrationFocalLength
+                showCropMarks = true // Always show crop marks in calibration mode
+                
+                // Switch to the correct iPhone lens
+                camera.switchInternalCamera(calibrationZoom)
+                
+                print("📸 CameraView entered calibration mode:")
+                print("   Capture plane: \(calibrationCapturePlane)")
+                print("   Focal length: \(calibrationFocalLength)mm")
+                print("   iPhone zoom: \(calibrationZoom)x")
+            } else {
+                // Normal mode: Set the initial selected gear if it exists
+                if selectedGear == nil, let firstGear = gearList.first {
+                    selectedGear = firstGear
+                    // Also set the initial focal length from the first available prime lens, or 80mm default
+                    selectedFocalLength = firstGear.lenses.first(where: { $0.type == .prime })?.primeFocalLength ?? 80
+                }
             }
 
             if camera.hasPermission {
@@ -1376,6 +1419,7 @@ struct CropMarksOverlay: View {
     let isVisible: Bool
     let isZoomLens: Bool
     let actualDiagonalFOV: CGFloat  // NEW: Actual diagonal FOV in radians from the iPhone camera
+    let currentZoomFactor: CGFloat  // NEW: Current iPhone zoom factor for calibration lookup
     // MODIFIED: Use a property to hold the default range for visualization
     let defaultZoomRange: (min: Int, max: Int) = (35, 75)
     
@@ -1386,6 +1430,7 @@ struct CropMarksOverlay: View {
                     capturePlane: capturePlane,
                     for: selectedFocalLength,
                     cameraFocalLength: currentCameraFocalLength,
+                    currentZoomFactor: currentZoomFactor,  // NEW: Pass zoom factor for calibration
                     // MODIFIED: Pass dimensions
                     capturePlaneWidth: capturePlaneWidth,
                     capturePlaneHeight: capturePlaneHeight,
@@ -1465,6 +1510,7 @@ struct CropMarksOverlay: View {
             capturePlane: capturePlane,
             for: defaultZoomRange.min, // MODIFIED: Use defaultZoomRange
             cameraFocalLength: currentCameraFocalLength,
+            currentZoomFactor: currentZoomFactor,  // NEW: Pass zoom factor
             capturePlaneWidth: capturePlaneWidth, // NEW
             capturePlaneHeight: capturePlaneHeight, // NEW
             capturePlaneDiagonal: capturePlaneDiagonal, // NEW
@@ -1475,6 +1521,7 @@ struct CropMarksOverlay: View {
             capturePlane: capturePlane,
             for: defaultZoomRange.max, // MODIFIED: Use defaultZoomRange
             cameraFocalLength: currentCameraFocalLength,
+            currentZoomFactor: currentZoomFactor,  // NEW: Pass zoom factor
             capturePlaneWidth: capturePlaneWidth, // NEW
             capturePlaneHeight: capturePlaneHeight, // NEW
             capturePlaneDiagonal: capturePlaneDiagonal, // NEW
@@ -1577,6 +1624,7 @@ struct CropMarksOverlay: View {
         capturePlane: String,
         for focalLength: Int,
         cameraFocalLength: Int,
+        currentZoomFactor: CGFloat,  // NEW: iPhone zoom factor for calibration lookup
         capturePlaneWidth: Double,
         capturePlaneHeight: Double,
         capturePlaneDiagonal: Double,
@@ -1642,6 +1690,7 @@ struct CropMarksOverlay: View {
         print("  simulatedHorizontalFov (radians): \(simulatedHorizontalFovRadians)")
         print("  simulatedHorizontalFov (degrees): \(simulatedHorizontalFovRadians * 180 / .pi)")
         print("  screenSize: \(screenSize)")
+        print("  currentZoomFactor: \(currentZoomFactor)x")
         #endif
         
         let simTan   = tan(simulatedHorizontalFovRadians / 2)
@@ -1656,6 +1705,43 @@ struct CropMarksOverlay: View {
         // < 1  => simulated camera has narrower FOV (smaller crop frame)
         let baseScaleFactor = simTan / iphoneTan
         
+        // 3.5. Apply calibration correction if available
+        // NOTE: Calibration factor represents the systematic error for this iPhone lens + capture plane combo.
+        // It should apply to ALL focal lengths used with this combination, since the iPhone's optical
+        // characteristics don't change with the simulated focal length.
+        let deviceModel = CameraCalibrationManager.shared.deviceModel
+        let lensType = formatZoomLevel(currentZoomFactor)  // "0.5x", "1x", "2x", etc.
+        
+        let finalScaleFactor: Double
+        if let calibrationData = CameraCalibrationManager.shared.getCorrectionFactorForCombo(
+            deviceModel: deviceModel,
+            lensType: lensType,
+            capturePlane: capturePlane
+        ) {
+            let correctionFactor = calibrationData.correctionFactor
+            let calibratedFocalLength = calibrationData.focalLength
+            finalScaleFactor = baseScaleFactor * correctionFactor
+            #if DEBUG
+            print("📏 Calibration applied:")
+            print("  Device: \(deviceModel)")
+            print("  Lens: \(lensType)")
+            print("  Capture plane: \(capturePlane)")
+            print("  Current focal length: \(focalLength)mm")
+            print("  Calibrated at focal length: \(calibratedFocalLength)mm")
+            print("  Base scale factor: \(String(format: "%.4f", baseScaleFactor))")
+            print("  Correction factor: \(String(format: "%.4f", correctionFactor))")
+            print("  Final scale factor: \(String(format: "%.4f", finalScaleFactor))")
+            print("  Accuracy adjustment: \(String(format: "%+.1f", (correctionFactor - 1.0) * 100))%")
+            print("  ℹ️  This correction applies to all focal lengths for this iPhone/plane combo")
+            #endif
+        } else {
+            finalScaleFactor = baseScaleFactor
+            #if DEBUG
+            print("ℹ️ No calibration found for: \(deviceModel) / \(lensType) / \(capturePlane)")
+            print("  Using uncalibrated scale factor: \(String(format: "%.4f", baseScaleFactor))")
+            #endif
+        }
+        
         // 4. Use the *short* side of the preview as the base dimension
         let previewShort = min(screenSize.width, screenSize.height)
         let previewLong  = max(screenSize.width, screenSize.height)
@@ -1666,7 +1752,8 @@ struct CropMarksOverlay: View {
         let aspectRatio  = longCapture / shortCapture  // ≥ 1
         
         // Map diagonal FOV ratio onto the short dimension in screen space
-        var cropShort = previewShort * CGFloat(baseScaleFactor)
+        // Use finalScaleFactor (calibrated if available, otherwise baseScaleFactor)
+        var cropShort = previewShort * CGFloat(finalScaleFactor)
         var cropLong  = cropShort * CGFloat(aspectRatio)
         
         // --- DEBUG: log effective capture plane for 6x6 + 80mm only ---
@@ -1716,6 +1803,19 @@ struct CropMarksOverlay: View {
         }
         
         return (width: width, height: height, isVisible: isVisibleRaw)
+    }
+    
+    // Helper function to format zoom level consistently with calibration system
+    private func formatZoomLevel(_ zoom: CGFloat) -> String {
+        // Round to nearest 0.5
+        let rounded = round(zoom * 2) / 2
+        
+        // Format without decimal if it's a whole number
+        if rounded.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(rounded))x"
+        } else {
+            return String(format: "%.1fx", rounded)
+        }
     }
     
     private func cornerMark(at corner: CornerPosition, in cropFrame: (width: CGFloat, height: CGFloat, isVisible: Bool), geometry: GeometryProxy, isVisible: Bool) -> some View {
