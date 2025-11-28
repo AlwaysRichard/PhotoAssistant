@@ -7,50 +7,6 @@
 
 import SwiftUI
 
-// MARK: - Plus/Minus Diagonal Icon
-
-struct PlusMinusDiagonalIcon: View {
-    var size: CGFloat = 18
-    var backgroundColor: Color = .black
-    var textColor: Color = .white
-    
-    var body: some View {
-        ZStack {
-            // Rounded background
-            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                .fill(backgroundColor)
-            // Diagonal slash
-            Rectangle()
-                .fill(textColor)
-                .frame(width: size * 0.075, height: size * 1.12)
-                .rotationEffect(.degrees(45))
-            // PLUS (top-left)
-            VStack {
-                HStack {
-                    Text("+")
-                        .font(.system(size: size * 0.42, weight: .bold))
-                        .foregroundColor(textColor)
-                        .padding(size * 0.10)
-                    Spacer()
-                }
-                Spacer()
-            }
-            // MINUS (bottom-right)
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Text("−") // true minus sign
-                        .font(.system(size: size * 0.42, weight: .bold))
-                        .foregroundColor(textColor)
-                        .padding(size * 0.10)
-                }
-            }
-        }
-        .frame(width: size, height: size)
-    }
-}
-
 // MARK: - Exposure Compensation View
 
 struct ExposureCompensationView: View {
@@ -60,10 +16,13 @@ struct ExposureCompensationView: View {
     @State private var selectedISO: ISOSetting
     @State private var selectedFilm: FilmReciprocity?
     
-    // MARK: - Calculate Settings
-    @State private var filter1: FilterSelection = .none
-    @State private var filter2: FilterSelection = .none
-    @State private var filter3: FilterSelection = .none
+    // MARK: - Filter Settings
+    @State private var attachedFilters: [AttachedFilter] = []
+    @State private var showFiltersView = false
+    
+    // MARK: - EV Compensation
+    @State private var evCompensation: Double = 0.0
+    @State private var showEVPicker = false
     
     // MARK: - Picker presentation
     @State private var showingFilmPicker = false
@@ -76,7 +35,6 @@ struct ExposureCompensationView: View {
     private let shutterSpeeds = ShutterSpeed.thirdStopScale
     private let isos = ISOSetting.thirdStopScale
     private let films: [FilmReciprocity]
-    private let filters: [FilterType]
     
     // MARK: - Computed Result
     private var calculatedExposure: ExposureResult {
@@ -98,15 +56,6 @@ struct ExposureCompensationView: View {
             self.films = []
         }
         
-        // Load filters from JSON
-        if let filterURL = Bundle.main.url(forResource: "PhotographyFilters", withExtension: "json"),
-           let filterData = try? Data(contentsOf: filterURL),
-           let database = try? JSONDecoder().decode(FilterDatabase.self, from: filterData) {
-            self.filters = database.filters
-        } else {
-            self.filters = []
-        }
-        
         // Initialize default values
         _selectedAperture = State(initialValue: fStops.first(where: { abs($0.value - 5.6) < 0.1 }) ?? fStops[0])
         _selectedShutterSpeed = State(initialValue: shutterSpeeds.first(where: { abs($0.seconds - 1.0/125.0) < 0.0001 }) ?? shutterSpeeds[0])
@@ -120,12 +69,12 @@ struct ExposureCompensationView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
             
-            // Filter selection section - scrollable
-            ScrollView {
-                VStack(spacing: 0) {
-                    filterSection
-                }
-            }
+            // Filter button
+            filterButtonSection
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+            
+            Spacer()
             
             // Results section - fixed at bottom
             resultSection
@@ -142,6 +91,12 @@ struct ExposureCompensationView: View {
         }
         .sheet(isPresented: $showingISOPicker) {
             isoPickerSheet
+        }
+        .sheet(isPresented: $showFiltersView) {
+            AttachedFiltersView(attachedFilters: $attachedFilters)
+        }
+        .sheet(isPresented: $showEVPicker) {
+            evPickerSheet
         }
     }
     
@@ -256,13 +211,16 @@ struct ExposureCompensationView: View {
                 
                 Spacer()
                 
-                HStack(spacing: 4) {
-                    Text("0.0")
-                        .font(.custom("American Typewriter", size: 18))
-                        .fontWeight(.semibold)
-                        .foregroundColor(.black)
-                    PlusMinusDiagonalIcon(size: 18, backgroundColor: .black, textColor: .white)
+                Button(action: { showEVPicker = true }) {
+                    HStack(spacing: 4) {
+                        Text(String(format: "%+.1f", evCompensation))
+                            .font(.custom("American Typewriter", size: 18))
+                            .fontWeight(.semibold)
+                            .foregroundColor(.black)
+                        PlusMinusDiagonalIcon(size: 18, backgroundColor: .black, textColor: .white)
+                    }
                 }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(.top, 10)
             .padding(.horizontal, 20)
@@ -286,32 +244,40 @@ struct ExposureCompensationView: View {
         .cornerRadius(8)
     }
     
-    // MARK: - Filter Section
+    // MARK: - Filter Button Section
     
-    private var filterSection: some View {
-        VStack(spacing: 0) {
-            FilterSelectorRow(
-                selection: $filter1,
-                filters: filters
-            )
-            .onChange(of: selectedFilm) { newFilm in
-                if let film = newFilm {
-                    if let filmISO = isos.first(where: { $0.value == Double(film.iso) }) {
-                        selectedISO = filmISO
-                    }
+    private var filterButtonSection: some View {
+        Button(action: { showFiltersView = true }) {
+            HStack {
+                Image(systemName: "camera.filters")
+                    .font(.system(size: 20))
+                    .foregroundColor(.primary)
+                
+                Text("Filters")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                if totalFilterStops > 0 {
+                    Text(String(format: "Stops +%.1f", totalFilterStops))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
             }
-            
-            FilterSelectorRow(
-                selection: $filter2,
-                filters: filters
-            )
-            
-            FilterSelectorRow(
-                selection: $filter3,
-                filters: filters
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(.separator), lineWidth: 1)
             )
         }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var totalFilterStops: Double {
+        attachedFilters.reduce(0) { $0 + $1.stops }
     }
     
     // MARK: - Result Section
@@ -586,11 +552,54 @@ struct ExposureCompensationView: View {
         }
     }
     
+    private var evPickerSheet: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                Text("EV Compensation")
+                    .font(.headline)
+                    .padding(.top)
+                
+                Text(String(format: "%+.1f", evCompensation))
+                    .font(.system(size: 60, weight: .bold))
+                    .monospacedDigit()
+                
+                Picker("EV", selection: $evCompensation) {
+                    ForEach(Array(stride(from: -10.0, through: 10.0, by: 1.0/3.0)), id: \.self) { ev in
+                        let rounded = (ev * 10).rounded() / 10.0
+                        Text(String(format: "%+.1f", rounded))
+                            .tag(rounded)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .labelsHidden()
+                
+                Spacer()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showEVPicker = false
+                    }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Reset") {
+                        evCompensation = 0.0
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+    
     // MARK: - Calculation Logic
     
     private func calculateExposure() -> ExposureResult {
         // Start with base EV
         var baseEV = selectedAperture.evOffset + selectedShutterSpeed.evOffset + selectedISO.evOffset
+        
+        // Apply EV compensation (positive = more exposure, negative = less exposure)
+        baseEV += evCompensation
         
         // Filters reduce light, so we need MORE exposure (longer shutter/wider aperture/higher ISO)
         // Subtracting filter stops from EV means we need to compensate elsewhere
@@ -643,13 +652,7 @@ struct ExposureCompensationView: View {
     }
     
     private func calculateFilterStops() -> Double {
-        var totalStops: Double = 0.0
-        
-        for filter in [filter1, filter2, filter3] {
-            totalStops += filter.compensationStops
-        }
-        
-        return totalStops
+        attachedFilters.reduce(0) { $0 + $1.stops }
     }
     
     private func applyReciprocity(meteredSeconds: Double, film: FilmReciprocity) -> ReciprocityResult {
@@ -773,165 +776,6 @@ struct ExposureCompensationView: View {
     
     private func findClosestShutterSpeed(_ seconds: Double) -> ShutterSpeed {
         shutterSpeeds.min(by: { abs($0.seconds - seconds) < abs($1.seconds - seconds) }) ?? shutterSpeeds[0]
-    }
-}
-
-// MARK: - Filter Selection Model
-
-enum FilterSelection: Hashable {
-    case none
-    case simple(FilterType, Double) // filter, stops
-    case variant(FilterType, FilterVariant, Double) // filter, variant, stops
-    
-    var compensationStops: Double {
-        switch self {
-        case .none:
-            return 0.0
-        case .simple(_, let stops):
-            return stops
-        case .variant(_, _, let stops):
-            return stops
-        }
-    }
-}
-
-// MARK: - Filter Selector Row
-
-struct FilterSelectorRow: View {
-    @Binding var selection: FilterSelection
-    let filters: [FilterType]
-    
-    @State private var selectedFilter: FilterType?
-    @State private var selectedVariant: FilterVariant?
-    @State private var customStops: Double = 1.0
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Spacer()
-                Picker("", selection: $selectedFilter) {
-                    Text("Select Filter").tag(nil as FilterType?)
-                    ForEach(filters) { filter in
-                        Text(filter.name).tag(Optional(filter))
-                    }
-                }
-                .pickerStyle(.menu)
-                .onChange(of: selectedFilter) { newFilter in
-                    handleFilterChange(newFilter)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            
-            if let filter = selectedFilter, filter.hasVariants {
-                HStack {
-                    Spacer()
-                    Picker("", selection: $selectedVariant) {
-                        Text("Select...").tag(nil as FilterVariant?)
-                        if let variants = filter.variants {
-                            ForEach(variants) { variant in
-                                Text(variant.name).tag(Optional(variant))
-                            }
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .onChange(of: selectedVariant) { _ in
-                        updateSelection()
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
-            }
-            
-            if let filter = selectedFilter, filter.isRange || needsCustomStops {
-                HStack {
-                    Text("Stops")
-                        .font(.subheadline)
-                    Slider(value: $customStops, in: getStopsRange(), step: 0.1)
-                    Text(String(format: "%.1f", customStops))
-                        .font(.subheadline)
-                        .frame(width: 40)
-                }
-                .padding(.horizontal)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
-                .onChange(of: customStops) { _ in
-                    updateSelection()
-                }
-            }
-            
-            Divider()
-                .background(Color.white)
-        }
-    }
-    
-    private var needsCustomStops: Bool {
-        guard let filter = selectedFilter else { return false }
-        if let variant = selectedVariant {
-            return variant.stopsMin != nil && variant.stopsMax != nil
-        }
-        return false
-    }
-    
-    private func getStopsRange() -> ClosedRange<Double> {
-        if let filter = selectedFilter {
-            if let variant = selectedVariant,
-               let min = variant.stopsMin,
-               let max = variant.stopsMax {
-                return min...max
-            }
-            if let min = filter.compensationStopsMin,
-               let max = filter.compensationStopsMax {
-                return min...max
-            }
-        }
-        return 0.0...10.0
-    }
-    
-    private func handleFilterChange(_ newFilter: FilterType?) {
-        selectedVariant = nil
-        
-        guard let filter = newFilter else {
-            selection = .none
-            return
-        }
-        
-        if filter.hasVariants {
-            // Wait for variant selection
-            selection = .none
-        } else if let stops = filter.compensationStops {
-            // Simple filter with fixed stops
-            selection = .simple(filter, stops)
-        } else if let min = filter.compensationStopsMin,
-                  let max = filter.compensationStopsMax {
-            // Range filter
-            customStops = (min + max) / 2.0
-            selection = .simple(filter, customStops)
-        }
-    }
-    
-    private func updateSelection() {
-        guard let filter = selectedFilter else {
-            selection = .none
-            return
-        }
-        
-        if let variant = selectedVariant {
-            let stops: Double
-            if let variantStops = variant.stops {
-                stops = variantStops
-            } else if variant.stopsMin != nil && variant.stopsMax != nil {
-                stops = customStops
-            } else {
-                stops = 0.0
-            }
-            selection = .variant(filter, variant, stops)
-        } else if filter.isRange {
-            selection = .simple(filter, customStops)
-        } else if let fixedStops = filter.compensationStops {
-            selection = .simple(filter, fixedStops)
-        }
     }
 }
 
