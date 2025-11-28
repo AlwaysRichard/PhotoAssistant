@@ -53,7 +53,20 @@ struct MyGearItemView: View {
                     }
                 }
                 Section(header: Text("Lenses")) {
-                    ForEach(lenses) { lens in
+                    // Sort primes first by focal length, then zooms by their min focal length
+                    let sortedLenses = lenses.sorted { lhs, rhs in
+                        if lhs.type == .prime, rhs.type == .prime {
+                            return (lhs.primeFocalLength ?? 0) < (rhs.primeFocalLength ?? 0)
+                        } else if lhs.type == .prime {
+                            return true
+                        } else if rhs.type == .prime {
+                            return false
+                        } else {
+                            // Both are zooms
+                            return (lhs.zoomRange?.min ?? 0) < (rhs.zoomRange?.min ?? 0)
+                        }
+                    }
+                    ForEach(sortedLenses) { lens in
                         Button(action: {
                             editingLens = lens
                         }) {

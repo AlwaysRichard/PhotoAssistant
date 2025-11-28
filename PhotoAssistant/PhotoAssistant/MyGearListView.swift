@@ -2,7 +2,10 @@ import SwiftUI
 
 struct MyGearListView: View {
     @State private var gearList: [MyGearModel] = MyGearModel.loadGearList()
+        .sorted(by: { $0.cameraName < $1.cameraName })
+    
     @State private var selectedGear: MyGearModel?
+    
     @State private var showAddCamera = false
 
     var body: some View {

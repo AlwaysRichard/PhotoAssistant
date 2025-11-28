@@ -15,6 +15,8 @@ import ImageIO
 import UniformTypeIdentifiers
 import SwiftData
 
+let kSelectedGearNameKey = "SelectedGearName" // Key for storing selected gear in UserDefaults
+
 // MARK: - REMOVED: struct FilmFormat { ... }
 // MARK: - REMOVED: struct ZoomLens { ... }
 // Assuming ZoomRange, Lens, and MyGearModel are available from MyGearModel.swift
@@ -89,6 +91,7 @@ struct CameraView: View {
                 // Crop marks overlay
                 CropMarksOverlay(
                     // MODIFIED: Pass dimensions instead of filmFormat struct
+                    capturePlane: currentGearData.capturePlane,
                     capturePlaneWidth: currentGearData.capturePlaneWidth,
                     capturePlaneHeight: currentGearData.capturePlaneHeight,
                     capturePlaneDiagonal: currentGearData.capturePlaneDiagonal,
@@ -279,10 +282,13 @@ struct CameraView: View {
         .onAppear {
             camera.setModelContext(modelContext)
             
-            // NEW: Set the initial selected gear if it exists
-            if selectedGear == nil, let firstGear = gearList.first {
+            // NEW: Restore selectedGear from UserDefaults if available
+            if let savedName = UserDefaults.standard.string(forKey: kSelectedGearNameKey),
+               let matchedGear = gearList.first(where: { $0.cameraName == savedName }) {
+                selectedGear = matchedGear
+                selectedFocalLength = matchedGear.lenses.first(where: { $0.type == .prime })?.primeFocalLength ?? 80
+            } else if selectedGear == nil, let firstGear = gearList.first {
                 selectedGear = firstGear
-                // Also set the initial focal length from the first available prime lens, or 80mm default
                 selectedFocalLength = firstGear.lenses.first(where: { $0.type == .prime })?.primeFocalLength ?? 80
             }
 
@@ -955,15 +961,15 @@ class CameraManager: NSObject, ObservableObject, CLLocationManagerDelegate, AVCa
     private func exifOrientationFromDeviceOrientation() -> Int {
         switch deviceOrientation {
         case .portrait:
-            return 6
+            return 6  // Right, top
         case .portraitUpsideDown:
-            return 8
+            return 8  // Left, bottom
         case .landscapeLeft:
-            return 3
+            return 1  // Up, left
         case .landscapeRight:
-            return 1
+            return 3  // Down, right
         default:
-            return 6
+            return 6  // Default to portrait
         }
     }
     
@@ -1219,6 +1225,7 @@ struct ZoomLens: Identifiable, Equatable {
 
 struct CropMarksOverlay: View {
     // MODIFIED: Accepts individual capture plane dimensions instead of a FilmFormat struct
+    let capturePlane: String
     let capturePlaneWidth: Double
     let capturePlaneHeight: Double
     let capturePlaneDiagonal: Double
@@ -1234,6 +1241,7 @@ struct CropMarksOverlay: View {
         if isVisible {
             GeometryReader { geometry in
                 let cropFrame = calculateCropFrame(
+                    capturePlane: capturePlane,
                     for: selectedFocalLength,
                     cameraFocalLength: currentCameraFocalLength,
                     // MODIFIED: Pass dimensions
@@ -1312,6 +1320,7 @@ struct CropMarksOverlay: View {
     
     private func zoomRangeVisualization(geometry: GeometryProxy) -> some View {
         let minCropFrame = calculateCropFrame(
+            capturePlane: capturePlane,
             for: defaultZoomRange.min, // MODIFIED: Use defaultZoomRange
             cameraFocalLength: currentCameraFocalLength,
             capturePlaneWidth: capturePlaneWidth, // NEW
@@ -1321,6 +1330,7 @@ struct CropMarksOverlay: View {
         )
         
         let maxCropFrame = calculateCropFrame(
+            capturePlane: capturePlane,
             for: defaultZoomRange.max, // MODIFIED: Use defaultZoomRange
             cameraFocalLength: currentCameraFocalLength,
             capturePlaneWidth: capturePlaneWidth, // NEW
@@ -1419,73 +1429,121 @@ struct CropMarksOverlay: View {
             .frame(width: 4, height: 4)
             .position(x: x, y: y)
     }
-
+    
     // MODIFIED: Function signature updated to use dynamic dimensions
-    private func calculateCropFrame(
+    func calculateCropFrame(
+        capturePlane: String,
         for focalLength: Int,
         cameraFocalLength: Int,
-        capturePlaneWidth: Double, // NEW: Used as FilmFormat.width
-        capturePlaneHeight: Double, // NEW
-        capturePlaneDiagonal: Double, // NEW
+        capturePlaneWidth: Double,
+        capturePlaneHeight: Double,
+        capturePlaneDiagonal: Double,
         in screenSize: CGSize
     ) -> (width: CGFloat, height: CGFloat, isVisible: Bool) {
-                
-        // 1. Define physical dimensions
-        // MODIFIED: Use the longer dimension for captureFrameWidth
-        let captureFrameWidth: Double = capturePlaneWidth > capturePlaneHeight ? capturePlaneWidth : capturePlaneHeight
-        let thirtyFiveMmFilmWidth: Double = 36.0  // Standard 35mm film width
         
-        // 2. Empirical Calibration Factor
-        //let previewLayerCalibrationFactor: Double = 100.0 / captureFrameWidth
-        //let previewLayerCalibrationFactor: Double = captureFrameWidth / 36.0
-        //let previewLayerCalibrationFactor: Double = 0.8 // ** for 6x6cm from the 500c
-        //let previewLayerCalibrationFactor: Double = 1.4 // ** for 43.8x32.9 from the X2D
+        // Basic sanity checks
+        guard focalLength > 0,
+              cameraFocalLength > 0,
+              capturePlaneWidth > 0,
+              capturePlaneHeight > 0,
+              screenSize.width > 0,
+              screenSize.height > 0
+        else {
+            return (width: 0, height: 0, isVisible: false)
+        }
         
-        // Using a linear relationship between the width of the sensor (capturePlaneWidth) and the
-        // required calibration factor. Coefficients derived from 6x6 (0.8) and X2D (1.4) data points
-        let slope: Double = -0.037037
-        let intercept: Double = 3.02222
-        let previewLayerCalibrationFactor: Double = (slope * captureFrameWidth) + intercept
-        
-        // Convert focal lengths to Double -- Keep These
+        // 1. Physical / optical parameters
         let selectedFocalDouble = Double(focalLength)
-        let cameraFocalDouble = Double(cameraFocalLength)
-
-        // 3. Calculate the FOV for the SIMULATED LENS (using physical captureFrameWidth)
-        let simulatedCaptureFrameFovRadians = 2 * atan(captureFrameWidth / (2 * selectedFocalDouble))
-
-        // 4. Calculate the FOV for the ACTIVE IPHONE CAMERA (using 36.0mm reference)
-        let activeiPhoneCameraFovRadians = 2 * atan(thirtyFiveMmFilmWidth / (2 * cameraFocalDouble))
-
-        // 5. Determine the base geometric scaling factor
-        let baseScaleFactor = tan(simulatedCaptureFrameFovRadians / 2) / tan(activeiPhoneCameraFovRadians / 2)
+        let cameraFocalDouble   = Double(cameraFocalLength)
         
-        // 6. Apply the empirical calibration to the scale factor
-        let calibratedScaleFactor = baseScaleFactor * previewLayerCalibrationFactor
+        // Use the provided capturePlaneDiagonal if valid, otherwise compute it
+        let captureDiagonal: Double
+        if capturePlaneDiagonal > 0 {
+            captureDiagonal = capturePlaneDiagonal
+        } else {
+            captureDiagonal = sqrt(capturePlaneWidth * capturePlaneWidth +
+                                   capturePlaneHeight * capturePlaneHeight)
+        }
         
-        // 7. Calculate the crop frame size
-        let baseCropWidth = screenSize.width * calibratedScaleFactor
+        // 35mm "reference" diagonal (36 × 24)
+        let thirtyFiveMmDiagonal: Double = sqrt(36.0 * 36.0 + 24.0 * 24.0)
         
-        // MODIFIED: Use short dimension for horizontal (width), long dimension for vertical (height)
-        let shortDimension = min(capturePlaneWidth, capturePlaneHeight)
-        let longDimension = max(capturePlaneWidth, capturePlaneHeight)
+        // 2. Diagonal FOVs
+        let simulatedFovRadians = 2 * atan(captureDiagonal / (2 * selectedFocalDouble))
+        let iPhoneFovRadians    = 2 * atan(thirtyFiveMmDiagonal / (2 * cameraFocalDouble))
         
-        let cropWidth = baseCropWidth * CGFloat(shortDimension / captureFrameWidth)
-        let cropHeight = baseCropWidth * CGFloat(longDimension / captureFrameWidth)
-
-        // 8. Determine visibility and clamp dimensions
-        let minCropDisplaySize: CGFloat = 50
-        let maxCropDisplayRatio: CGFloat = 1.0
-
-        // Check if the crop is valid (large enough to see) and not excessively large
-        let isVisible = (cropWidth >= minCropDisplaySize && cropHeight >= minCropDisplaySize) &&
-                        (cropWidth <= screenSize.width * maxCropDisplayRatio && cropHeight <= screenSize.height * maxCropDisplayRatio)
+        let simTan   = tan(simulatedFovRadians / 2)
+        let iphoneTan = tan(iPhoneFovRadians / 2)
         
-        // Clamp the display size to prevent it from exceeding the screen's bounds
-        let displayWidth = min(cropWidth, screenSize.width)
-        let displayHeight = min(cropHeight, screenSize.height)
+        guard simTan > 0, iphoneTan > 0 else {
+            return (width: 0, height: 0, isVisible: false)
+        }
         
-        return (width: displayWidth, height: displayHeight, isVisible: isVisible)
+        // 3. Geometric scale factor between FOVs
+        // > 1  => simulated camera has wider FOV than iPhone (larger crop frame)
+        // < 1  => simulated camera has narrower FOV (smaller crop frame)
+        let baseScaleFactor = simTan / iphoneTan
+        
+        // 4. Use the *short* side of the preview as the base dimension
+        let previewShort = min(screenSize.width, screenSize.height)
+        let previewLong  = max(screenSize.width, screenSize.height)
+        
+        // 5. Capture frame aspect ratio (long / short)
+        let shortCapture = min(capturePlaneWidth, capturePlaneHeight)
+        let longCapture  = max(capturePlaneWidth, capturePlaneHeight)
+        let aspectRatio  = longCapture / shortCapture  // ≥ 1
+        
+        // Map diagonal FOV ratio onto the short dimension in screen space
+        var cropShort = previewShort * CGFloat(baseScaleFactor)
+        var cropLong  = cropShort * CGFloat(aspectRatio)
+        
+        // --- DEBUG: log effective capture plane for 6x6 + 80mm only ---
+        
+#if DEBUG
+        let testingDistanceInInches: Double = 36  // 3 feet
+        
+        logEffectiveCapturePlaneWithDistance(
+            cropShort: cropShort,
+            previewShort: previewShort,
+            focalLength: focalLength,
+            distanceInInches: testingDistanceInInches,
+            cameraFocalLength: cameraFocalLength,
+            capturePlaneName: capturePlane,
+            configuredWidth: capturePlaneWidth,
+            configuredHeight: capturePlaneHeight,
+            configuredDiagonal: capturePlaneDiagonal
+        )
+#endif
+        // --- END DEBUG ---
+        
+        // 6. Visibility / clamping
+        let minCropDisplaySize: CGFloat  = 50.0
+        let maxCropDisplayRatio: CGFloat = 1.0   // don’t let crop exceed preview bounds
+        
+        let isVisibleRaw =
+        cropShort >= minCropDisplaySize &&
+        cropLong  >= minCropDisplaySize &&
+        cropShort <= previewShort * maxCropDisplayRatio &&
+        cropLong  <= previewLong  * maxCropDisplayRatio
+        
+        // Clamp to the actual preview bounds
+        cropShort = min(cropShort, previewShort)
+        cropLong  = min(cropLong,  previewLong)
+        
+        // 7. Orient width/height so short ↔ short
+        let width: CGFloat
+        let height: CGFloat
+        if screenSize.width <= screenSize.height {
+            // Portrait: width = short side, height = long side
+            width  = cropShort
+            height = cropLong
+        } else {
+            // Landscape: width = long side, height = short side
+            width  = cropLong
+            height = cropShort
+        }
+        
+        return (width: width, height: height, isVisible: isVisibleRaw)
     }
     
     private func cornerMark(at corner: CornerPosition, in cropFrame: (width: CGFloat, height: CGFloat, isVisible: Bool), geometry: GeometryProxy, isVisible: Bool) -> some View {
@@ -1554,6 +1612,129 @@ struct CropMarksOverlay: View {
         }
         .position(x: x, y: y)
     }
+    
+    private func logEffectiveCapturePlaneWithDistance(
+        cropShort: CGFloat,
+        previewShort: CGFloat,
+        focalLength: Int,
+        distanceInInches: Double,
+        cameraFocalLength: Int,
+        capturePlaneName: String,
+        configuredWidth: Double,
+        configuredHeight: Double,
+        configuredDiagonal: Double
+    ) {
+        guard cropShort > 0,
+              previewShort > 0,
+              focalLength > 0,
+              cameraFocalLength > 0,
+              distanceInInches > 0 else {
+            print("🔍 [\(capturePlaneName)] Debug: invalid inputs.")
+            return
+        }
+        
+        // Convert distance to mm
+        let distanceMM = distanceInInches * 25.4
+        
+        // Ratio between overlay short side and preview short side
+        let ratio = Double(cropShort / previewShort)
+        
+        // iPhone diagonal FOV (using 35mm reference diagonal)
+        let diag35 = sqrt(36.0 * 36.0 + 24.0 * 24.0)
+        let iphoneFovDiag = 2.0 * atan(diag35 / (2.0 * Double(cameraFocalLength)))
+        let iphoneTan = tan(iphoneFovDiag / 2.0)
+        
+        // Simulated FOV (diagonal) inferred from crop ratio
+        let simTan = ratio * iphoneTan
+        let simFovDiag = 2.0 * atan(simTan)
+        
+        // Effective diagonal from FOV + focal length
+        let fSim = Double(focalLength)
+        let effectiveDiagonal = 2.0 * fSim * tan(simFovDiag / 2.0)
+        
+        // Actual configured diagonal
+        let cfgDiag = configuredDiagonal > 0
+            ? configuredDiagonal
+            : hypot(configuredWidth, configuredHeight)
+        
+        let scale = effectiveDiagonal / cfgDiag
+        let effectiveWidthMM  = configuredWidth  * scale
+        let effectiveHeightMM = configuredHeight * scale
+        
+        // Convert mm → inches
+        let effWidthIn   = mmToInches(effectiveWidthMM)
+        let effHeightIn  = mmToInches(effectiveHeightMM)
+        let effDiagIn    = mmToInches(effectiveDiagonal)
+        
+        let cfgWidthIn   = mmToInches(configuredWidth)
+        let cfgHeightIn  = mmToInches(configuredHeight)
+        let cfgDiagIn    = mmToInches(cfgDiag)
+        
+        // Expected physical HORIZONTAL & VERTICAL field at this distance
+        //
+        // HFOVw = 2 * atan( (sensorWidth / 2)  / f )
+        // HFOVh = 2 * atan( (sensorHeight / 2) / f )
+        let hfovWidth  = 2.0 * atan((configuredWidth  / 2.0) / fSim)
+        let hfovHeight = 2.0 * atan((configuredHeight / 2.0) / fSim)
+        
+        let expectedWidthMM  = 2.0 * distanceMM * tan(hfovWidth  / 2.0)
+        let expectedHeightMM = 2.0 * distanceMM * tan(hfovHeight / 2.0)
+        
+        let expectedWidthIn  = mmToInches(expectedWidthMM)
+        let expectedHeightIn = mmToInches(expectedHeightMM)
+        
+        // Observed horizontal & vertical field (from effective size)
+        let effHfovWidth  = 2.0 * atan((effectiveWidthMM  / 2.0) / fSim)
+        let effHfovHeight = 2.0 * atan((effectiveHeightMM / 2.0) / fSim)
+        
+        let observedWidthMM  = 2.0 * distanceMM * tan(effHfovWidth  / 2.0)
+        let observedHeightMM = 2.0 * distanceMM * tan(effHfovHeight / 2.0)
+        
+        let observedWidthIn  = mmToInches(observedWidthMM)
+        let observedHeightIn = mmToInches(observedHeightMM)
+        
+        print("""
+        
+        📷 DEBUG: \(capturePlaneName) with \(focalLength)mm at \(distanceInInches) inches
+        ------------------------------------------------------------
+        
+        CONFIGURED CAPTURE PLANE:
+          width   = \(configuredWidth) mm  (\(formatInches(cfgWidthIn)))
+          height  = \(configuredHeight) mm (\(formatInches(cfgHeightIn)))
+          diagonal= \(cfgDiag) mm          (\(formatInches(cfgDiagIn)))
+        
+        EFFECTIVE (from overlay at this distance):
+          eff width   = \(effectiveWidthMM) mm  (\(formatInches(effWidthIn)), \(formatFeetInches(effWidthIn)))
+          eff height  = \(effectiveHeightMM) mm (\(formatInches(effHeightIn)), \(formatFeetInches(effHeightIn)))
+          eff diagonal= \(effectiveDiagonal) mm (\(formatInches(effDiagIn)))
+        
+        FIELD AT DISTANCE \(distanceInInches) in (\(distanceMM) mm):
+          Expected  width  = \(formatInches(expectedWidthIn))  (\(formatFeetInches(expectedWidthIn)))
+          Expected  height = \(formatInches(expectedHeightIn)) (\(formatFeetInches(expectedHeightIn)))
+        
+        ADDITIONAL:
+          ratio cropShort/previewShort = \(ratio)
+          iPhone FOV diag (deg)        = \((iphoneFovDiag * 180.0 / .pi))
+          simulated FOV diag (deg)     = \((simFovDiag * 180.0 / .pi))
+        
+        ------------------------------------------------------------
+        """)
+    }
+
+    
+    private func mmToInches(_ mm: Double) -> Double {
+        mm / 25.4
+    }
+
+    private func formatInches(_ inches: Double) -> String {
+        String(format: "%.2f in", inches)
+    }
+
+    private func formatFeetInches(_ inches: Double) -> String {
+        let feet = Int(inches / 12.0)
+        let leftover = inches - Double(feet) * 12.0
+        return String(format: "%d ft %.2f in", feet, leftover)
+    }
 }
 
 struct CropMarksControlPanel: View {
@@ -1568,23 +1749,29 @@ struct CropMarksControlPanel: View {
     // MODIFIED: Compute available lenses from selected gear instead of hardcoding
     private var availableFixedLenses: [Int] {
         guard let gear = selectedGear else { return [] }
-        return gear.lenses.filter { $0.type == .prime }.compactMap { $0.primeFocalLength }
+        return gear.lenses
+            .filter { $0.type == .prime }
+            .compactMap { $0.primeFocalLength }
+            .sorted()
     }
     
     // MODIFIED: Compute available zoom lenses from selected gear
     private var availableZoomLenses: [ZoomLens] {
         guard let gear = selectedGear else { return [] }
-        return gear.lenses.filter { $0.type == .zoom && $0.zoomRange != nil }.map { lens in
-            ZoomLens(
-                name: lens.name,
-                minFocal: lens.zoomRange!.min,
-                maxFocal: lens.zoomRange!.max
-            )
-        }
+        return gear.lenses
+            .filter { $0.type == .zoom && $0.zoomRange != nil }
+            .map { lens in
+                ZoomLens(
+                    name: lens.name,
+                    minFocal: lens.zoomRange!.min,
+                    maxFocal: lens.zoomRange!.max
+                )
+            }
+            .sorted(by: { $0.minFocal < $1.minFocal })
     }
     
     // MODIFIED: Tracks the currently selected zoom lens object, if any
-    @State private var selectedZoomLens: ZoomLens? = nil
+    @State private var selectedLens: ZoomLens? = nil
 
     // MARK: - Extracted Sub-Views for Compiler Stability
 
@@ -1624,11 +1811,14 @@ struct CropMarksControlPanel: View {
                         }
                     }
                     // Reset zoom lens selection
-                    selectedZoomLens = nil
+                    selectedLens = nil
                     // Keep crop marks visible if they were visible
                     if showCropMarks {
                         withAnimation { showCropMarks = true }
                     }
+                    
+                    // NEW: Store selected gear camera name in UserDefaults
+                    UserDefaults.standard.setValue(gear.cameraName, forKey: kSelectedGearNameKey)
                 }
             }
         }
@@ -1655,24 +1845,26 @@ struct CropMarksControlPanel: View {
     
     @ViewBuilder
     private var lensButtonsView: some View {
-        HStack(spacing: 8) {
-            // Fixed focal length lenses
-            ForEach(availableFixedLenses, id: \.self) { focalLength in
-                fixedLensButton(focalLength: focalLength)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // Fixed focal length lenses
+                ForEach(availableFixedLenses, id: \.self) { focalLength in
+                    fixedLensButton(focalLength: focalLength)
+                }
+                
+                // Zoom lenses
+                ForEach(availableZoomLenses) { zoom in
+                    zoomLensButton(zoom: zoom)
+                }
+                
+                Spacer()
             }
-            
-            // Zoom lenses
-            ForEach(availableZoomLenses) { zoom in
-                zoomLensButton(zoom: zoom)
-            }
-            
-            Spacer()
         }
     }
     
     @ViewBuilder
     private func fixedLensButton(focalLength: Int) -> some View {
-        let isSelected = (selectedZoomLens == nil && selectedFocalLength == focalLength && showCropMarks)
+        let isSelected = (selectedLens == nil && selectedFocalLength == focalLength && showCropMarks)
         
         Button(action: {
             if isSelected {
@@ -1681,7 +1873,7 @@ struct CropMarksControlPanel: View {
             } else {
                 // Tapping a new fixed lens: Turn ON marks
                 selectedFocalLength = focalLength
-                selectedZoomLens = nil // Ensure no zoom lens is active
+                selectedLens = nil // Ensure no zoom lens is active
                 withAnimation { showCropMarks = true }
             }
         }) {
@@ -1704,24 +1896,24 @@ struct CropMarksControlPanel: View {
     
     @ViewBuilder
     private func zoomLensButton(zoom: ZoomLens) -> some View {
-        let isSelected = (selectedZoomLens == zoom && showCropMarks)
+        let isSelected = (selectedLens == zoom && showCropMarks)
         
         Button(action: {
             if isSelected {
                 // Tapping the currently selected zoom lens: Turn OFF marks
                 withAnimation {
                     showCropMarks = false
-                    selectedZoomLens = nil
+                    selectedLens = nil
                 }
             } else {
                 // Tapping to select zoom lens: Turn ON marks
-                selectedZoomLens = zoom
+                selectedLens = zoom
                 // Set to middle of zoom range
                 selectedFocalLength = Int(round(Double(zoom.minFocal + zoom.maxFocal) / 2.0))
                 withAnimation { showCropMarks = true }
             }
         }) {
-            Text(zoom.name)
+            Text("\(zoom.minFocal)-\(zoom.maxFocal)mm")
                 .font(.system(size: 13, weight: isSelected ? .bold : .regular))
                 .foregroundColor(isSelected ? .black : .white)
                 .padding(.horizontal, 10)
@@ -1741,7 +1933,7 @@ struct CropMarksControlPanel: View {
     @ViewBuilder
     private var zoomSliderView: some View {
         // Zoom slider (only show when a zoom lens is selected)
-        if let activeZoomLens = selectedZoomLens {
+        if let activeZoomLens = selectedLens {
             VStack(spacing: 4) {
                 HStack {
                     Text("\(activeZoomLens.minFocal)mm")
@@ -1826,6 +2018,7 @@ struct CropMarksControlPanel: View {
             }
             
             formatInfoView
+
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -1838,7 +2031,7 @@ struct CropMarksControlPanel: View {
             if let initialZoomLens = availableZoomLenses.first(where: {
                 selectedFocalLength >= $0.minFocal && selectedFocalLength <= $0.maxFocal
             }) {
-                selectedZoomLens = initialZoomLens
+                selectedLens = initialZoomLens
             }
         }
     }
