@@ -96,6 +96,21 @@ struct AttachedFiltersView: View {
                         }
                     }
                 }
+                
+                if !attachedFilters.isEmpty {
+                    Section {
+                        Button(action: {
+                            attachedFilters.removeAll()
+                        }) {
+                            HStack {
+                                Spacer()
+                                Text("Delete All Filters")
+                                    .foregroundColor(.red)
+                                Spacer()
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)

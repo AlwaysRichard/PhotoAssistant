@@ -46,6 +46,14 @@ struct ExposureCompensationView: View {
         selectedAperture.evOffset + selectedShutterSpeed.evOffset + selectedISO.evOffset
     }
     
+    // MARK: - UserDefaults Keys
+    private let kSelectedFilmID = "ExposureComp.selectedFilmID"
+    private let kSelectedAperture = "ExposureComp.selectedAperture"
+    private let kSelectedShutterSpeed = "ExposureComp.selectedShutterSpeed"
+    private let kSelectedISO = "ExposureComp.selectedISO"
+    private let kEVCompensation = "ExposureComp.evCompensation"
+    private let kAttachedFilters = "ExposureComp.attachedFilters"
+    
     init() {
         // Load films from JSON
         if let filmURL = Bundle.main.url(forResource: "FilmReciprocityConversionFactors", withExtension: "json"),
@@ -56,10 +64,47 @@ struct ExposureCompensationView: View {
             self.films = []
         }
         
-        // Initialize default values
-        _selectedAperture = State(initialValue: fStops.first(where: { abs($0.value - 5.6) < 0.1 }) ?? fStops[0])
-        _selectedShutterSpeed = State(initialValue: shutterSpeeds.first(where: { abs($0.seconds - 1.0/125.0) < 0.0001 }) ?? shutterSpeeds[0])
-        _selectedISO = State(initialValue: isos.first(where: { $0.value == 100 }) ?? isos[0])
+        // Load saved values from UserDefaults or use defaults
+        let savedAperture = UserDefaults.standard.double(forKey: kSelectedAperture)
+        let savedShutter = UserDefaults.standard.double(forKey: kSelectedShutterSpeed)
+        let savedISO = UserDefaults.standard.double(forKey: kSelectedISO)
+        let savedEV = UserDefaults.standard.double(forKey: kEVCompensation)
+        
+        // Initialize aperture
+        if savedAperture > 0, let aperture = fStops.first(where: { abs($0.value - savedAperture) < 0.1 }) {
+            _selectedAperture = State(initialValue: aperture)
+        } else {
+            _selectedAperture = State(initialValue: fStops.first(where: { abs($0.value - 5.6) < 0.1 }) ?? fStops[0])
+        }
+        
+        // Initialize shutter speed
+        if savedShutter > 0, let shutter = shutterSpeeds.first(where: { abs($0.seconds - savedShutter) < 0.0001 }) {
+            _selectedShutterSpeed = State(initialValue: shutter)
+        } else {
+            _selectedShutterSpeed = State(initialValue: shutterSpeeds.first(where: { abs($0.seconds - 1.0/125.0) < 0.0001 }) ?? shutterSpeeds[0])
+        }
+        
+        // Initialize ISO
+        if savedISO > 0, let iso = isos.first(where: { $0.value == savedISO }) {
+            _selectedISO = State(initialValue: iso)
+        } else {
+            _selectedISO = State(initialValue: isos.first(where: { $0.value == 100 }) ?? isos[0])
+        }
+        
+        // Initialize EV compensation
+        _evCompensation = State(initialValue: savedEV)
+        
+        // Load saved film
+        if let savedFilmID = UserDefaults.standard.string(forKey: kSelectedFilmID),
+           let savedFilm = films.first(where: { $0.id == savedFilmID }) {
+            _selectedFilm = State(initialValue: savedFilm)
+        }
+        
+        // Load saved filters
+        if let filtersData = UserDefaults.standard.data(forKey: kAttachedFilters),
+           let savedFilters = try? JSONDecoder().decode([AttachedFilter].self, from: filtersData) {
+            _attachedFilters = State(initialValue: savedFilters)
+        }
     }
     
     var body: some View {
@@ -79,7 +124,31 @@ struct ExposureCompensationView: View {
             // Results section - fixed at bottom
             resultSection
         }
+        .navigationTitle("Exposure Compensation")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: selectedFilm) { oldValue, newValue in
+            saveFilm(newValue)
+            if let film = newValue {
+                if let filmISO = isos.first(where: { $0.value == Double(film.iso) }) {
+                    selectedISO = filmISO
+                }
+            }
+        }
+        .onChange(of: selectedAperture) { oldValue, newValue in
+            saveAperture(newValue)
+        }
+        .onChange(of: selectedShutterSpeed) { oldValue, newValue in
+            saveShutterSpeed(newValue)
+        }
+        .onChange(of: selectedISO) { oldValue, newValue in
+            saveISO(newValue)
+        }
+        .onChange(of: evCompensation) { oldValue, newValue in
+            saveEVCompensation(newValue)
+        }
+        .onChange(of: attachedFilters) { oldValue, newValue in
+            saveFilters(newValue)
+        }
         .sheet(isPresented: $showingFilmPicker) {
             filmPickerSheet
         }
@@ -280,6 +349,19 @@ struct ExposureCompensationView: View {
         attachedFilters.reduce(0) { $0 + $1.stops }
     }
     
+    private let maxShutterSeconds = 28800.0 // 8 hours
+    
+    private func isOutOfRange(_ seconds: Double) -> Bool {
+        seconds > maxShutterSeconds
+    }
+    
+    private func formatShutterOrOutOfRange(_ speed: ShutterSpeed, _ actualSeconds: Double) -> String {
+        if isOutOfRange(actualSeconds) {
+            return "> 8h"
+        }
+        return speed.label
+    }
+    
     // MARK: - Result Section
     
     private var resultSection: some View {
@@ -313,12 +395,24 @@ struct ExposureCompensationView: View {
             
             
             // ┌───────────────────────────────────────────────┐
-            // │ Base Exposure                                 │
+            // │ Base Exposure (After Filters, Before Reciprocity) │
             // └───────────────────────────────────────────────┘
             VStack(alignment: .leading, spacing: 4) {
                 ResultRow(label: "Aperture", value: calculatedExposure.aperture.label)
-                ResultRow(label: "Shutter Speed", value: calculatedExposure.calculatedShutterSpeed.label)
+                ResultRow(
+                    label: "Shutter Speed",
+                    value: isOutOfRange(calculatedExposure.calculatedSeconds)
+                        ? "Out of Range"
+                        : calculatedExposure.calculatedShutterSpeed.label
+                )
                 ResultRow(label: "ISO", value: calculatedExposure.iso.label)
+                
+                if isOutOfRange(calculatedExposure.calculatedSeconds) {
+                    Text("⚠️ Exceeds 8 hour maximum")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                        .padding(.top, 2)
+                }
             }
             .padding(12)
 
@@ -383,16 +477,25 @@ struct ExposureCompensationView: View {
                 .padding(.vertical, 2)
 
             ResultRow(label: "Aperture", value: calculatedExposure.aperture.label)
-            ResultRow(label: "Shutter Speed", value: calculatedExposure.shutterSpeed.label)
+            ResultRow(
+                label: "Shutter Speed",
+                value: isOutOfRange(calculatedExposure.correctedSeconds)
+                    ? "Out of Range"
+                    : calculatedExposure.shutterSpeed.label
+            )
             ResultRow(label: "ISO", value: calculatedExposure.iso.label)
 
-            /*
-            Text(String(format: "Note: Includes Film Reciprocity %.1fs",
-                        meteredSeconds))
-                .font(.caption2)
-                .foregroundColor(.white.opacity(0.6))
-                .padding(.top, 2)
-            */
+            if isOutOfRange(calculatedExposure.correctedSeconds) {
+                Text("⚠️ Exceeds 8 hour maximum")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+                    .padding(.top, 2)
+            } else if calculatedExposure.reciprocityInfo?.beyondDocumentedRange == true {
+                Text("⚠️ Beyond \(filmName) documented reciprocity range")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+                    .padding(.top, 2)
+            }
         }
         .padding(12)
         .background(Color.black)
@@ -621,6 +724,7 @@ struct ExposureCompensationView: View {
         
         // Determine final shutter speed (with or without reciprocity)
         var finalShutterSpeed: ShutterSpeed
+        var correctedSeconds = requiredSeconds  // Track actual corrected seconds
         var reciprocityInfo: ReciprocityInfo?
         
         if let film = selectedFilm {
@@ -629,12 +733,14 @@ struct ExposureCompensationView: View {
                 meteredSeconds: requiredSeconds,
                 film: film
             )
+            correctedSeconds = reciprocityResult.correctedSeconds
             finalShutterSpeed = findClosestShutterSpeed(reciprocityResult.correctedSeconds)
             
             if reciprocityResult.correctionApplied {
                 reciprocityInfo = ReciprocityInfo(
                     filmName: film.name,
-                    meteredSeconds: reciprocityResult.meteredSeconds
+                    meteredSeconds: reciprocityResult.meteredSeconds,
+                    beyondDocumentedRange: reciprocityResult.beyondDocumentedRange
                 )
             }
         } else {
@@ -645,7 +751,9 @@ struct ExposureCompensationView: View {
         return ExposureResult(
             aperture: targetAperture,
             calculatedShutterSpeed: calculatedShutter,
+            calculatedSeconds: requiredSeconds,
             shutterSpeed: finalShutterSpeed,
+            correctedSeconds: correctedSeconds,
             iso: targetISO,
             reciprocityInfo: reciprocityInfo
         )
@@ -663,13 +771,15 @@ struct ExposureCompensationView: View {
                 return ReciprocityResult(
                     meteredSeconds: meteredSeconds,
                     correctedSeconds: meteredSeconds,
-                    correctionApplied: false
+                    correctionApplied: false,
+                    beyondDocumentedRange: false
                 )
             }
             return ReciprocityResult(
                 meteredSeconds: meteredSeconds,
                 correctedSeconds: meteredSeconds,
-                correctionApplied: false
+                correctionApplied: false,
+                beyondDocumentedRange: false
             )
             
         case .powerLaw(let model):
@@ -677,14 +787,17 @@ struct ExposureCompensationView: View {
                 return ReciprocityResult(
                     meteredSeconds: meteredSeconds,
                     correctedSeconds: meteredSeconds,
-                    correctionApplied: false
+                    correctionApplied: false,
+                    beyondDocumentedRange: false
                 )
             }
+            // Power law models don't have an upper bound, so never beyond range
             let corrected = pow(meteredSeconds, model.factor)
             return ReciprocityResult(
                 meteredSeconds: meteredSeconds,
                 correctedSeconds: corrected,
-                correctionApplied: true
+                correctionApplied: true,
+                beyondDocumentedRange: false
             )
             
         case .lookupTable(let model):
@@ -692,9 +805,14 @@ struct ExposureCompensationView: View {
                 return ReciprocityResult(
                     meteredSeconds: meteredSeconds,
                     correctedSeconds: meteredSeconds,
-                    correctionApplied: false
+                    correctionApplied: false,
+                    beyondDocumentedRange: false
                 )
             }
+            // Check if beyond documented range
+            let maxMetered = model.dataPoints.map { $0.metered }.max() ?? 0.0
+            let beyondRange = meteredSeconds > maxMetered
+            
             let corrected = interpolateLookupTable(
                 metered: meteredSeconds,
                 dataPoints: model.dataPoints
@@ -702,7 +820,8 @@ struct ExposureCompensationView: View {
             return ReciprocityResult(
                 meteredSeconds: meteredSeconds,
                 correctedSeconds: corrected,
-                correctionApplied: true
+                correctionApplied: true,
+                beyondDocumentedRange: beyondRange
             )
             
         case .stopCorrection(let model):
@@ -710,9 +829,14 @@ struct ExposureCompensationView: View {
                 return ReciprocityResult(
                     meteredSeconds: meteredSeconds,
                     correctedSeconds: meteredSeconds,
-                    correctionApplied: false
+                    correctionApplied: false,
+                    beyondDocumentedRange: false
                 )
             }
+            // Check if beyond documented range
+            let maxMetered = model.dataPoints.map { $0.metered }.max() ?? 0.0
+            let beyondRange = meteredSeconds > maxMetered
+            
             let stopAdjustment = interpolateStopCorrection(
                 metered: meteredSeconds,
                 dataPoints: model.dataPoints
@@ -721,7 +845,8 @@ struct ExposureCompensationView: View {
             return ReciprocityResult(
                 meteredSeconds: meteredSeconds,
                 correctedSeconds: corrected,
-                correctionApplied: true
+                correctionApplied: true,
+                beyondDocumentedRange: beyondRange
             )
         }
     }
@@ -730,13 +855,24 @@ struct ExposureCompensationView: View {
         // Find surrounding points
         guard !dataPoints.isEmpty else { return metered }
         
+        // Before first point: return first corrected value
         if metered <= dataPoints.first!.metered {
             return dataPoints.first!.corrected
         }
+        
+        // After last point: extrapolate using the slope of the last segment
         if metered >= dataPoints.last!.metered {
+            if dataPoints.count >= 2 {
+                let p1 = dataPoints[dataPoints.count - 2]
+                let p2 = dataPoints[dataPoints.count - 1]
+                let slope = (p2.corrected - p1.corrected) / (p2.metered - p1.metered)
+                let extrapolated = p2.corrected + slope * (metered - p2.metered)
+                return extrapolated
+            }
             return dataPoints.last!.corrected
         }
         
+        // Within table: interpolate
         for i in 0..<(dataPoints.count - 1) {
             let p1 = dataPoints[i]
             let p2 = dataPoints[i + 1]
@@ -777,6 +913,38 @@ struct ExposureCompensationView: View {
     private func findClosestShutterSpeed(_ seconds: Double) -> ShutterSpeed {
         shutterSpeeds.min(by: { abs($0.seconds - seconds) < abs($1.seconds - seconds) }) ?? shutterSpeeds[0]
     }
+    
+    // MARK: - UserDefaults Save Methods
+    
+    private func saveFilm(_ film: FilmReciprocity?) {
+        if let film = film {
+            UserDefaults.standard.set(film.id, forKey: kSelectedFilmID)
+        } else {
+            UserDefaults.standard.removeObject(forKey: kSelectedFilmID)
+        }
+    }
+    
+    private func saveAperture(_ aperture: FStop) {
+        UserDefaults.standard.set(aperture.value, forKey: kSelectedAperture)
+    }
+    
+    private func saveShutterSpeed(_ speed: ShutterSpeed) {
+        UserDefaults.standard.set(speed.seconds, forKey: kSelectedShutterSpeed)
+    }
+    
+    private func saveISO(_ iso: ISOSetting) {
+        UserDefaults.standard.set(iso.value, forKey: kSelectedISO)
+    }
+    
+    private func saveEVCompensation(_ ev: Double) {
+        UserDefaults.standard.set(ev, forKey: kEVCompensation)
+    }
+    
+    private func saveFilters(_ filters: [AttachedFilter]) {
+        if let encoded = try? JSONEncoder().encode(filters) {
+            UserDefaults.standard.set(encoded, forKey: kAttachedFilters)
+        }
+    }
 }
 
 // MARK: - Result Row
@@ -804,7 +972,9 @@ struct ResultRow: View {
 struct ExposureResult {
     let aperture: FStop
     let calculatedShutterSpeed: ShutterSpeed  // Before reciprocity
+    let calculatedSeconds: Double              // Actual calculated seconds (may exceed max)
     let shutterSpeed: ShutterSpeed            // After reciprocity (if applicable)
+    let correctedSeconds: Double               // Actual corrected seconds (may exceed max)
     let iso: ISOSetting
     let reciprocityInfo: ReciprocityInfo?
 }
@@ -812,12 +982,14 @@ struct ExposureResult {
 struct ReciprocityInfo {
     let filmName: String
     let meteredSeconds: Double
+    let beyondDocumentedRange: Bool
 }
 
 struct ReciprocityResult {
     let meteredSeconds: Double
     let correctedSeconds: Double
     let correctionApplied: Bool
+    let beyondDocumentedRange: Bool
 }
 
 // MARK: - Color Extension for Hex
