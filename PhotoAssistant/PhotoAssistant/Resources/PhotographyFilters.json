@@ -1,0 +1,97 @@
+{
+  "filters": [
+    {
+      "id": "uv",
+      "name": "UV / Skylight",
+      "category": "protective",
+      "compensationStops": 0
+    },
+    {
+      "id": "cpl",
+      "name": "Circular Polarizer",
+      "category": "polarizing",
+      "compensationStopsMin": 1.0,
+      "compensationStopsMax": 2.0
+    },
+    {
+      "id": "nd",
+      "name": "Neutral Density Filters",
+      "category": "nd",
+      "variants": [
+        { "nd": "ND2", "opticalDensity": 0.3, "stops": 1 },
+        { "nd": "ND4", "opticalDensity": 0.6, "stops": 2 },
+        { "nd": "ND8", "opticalDensity": 0.9, "stops": 3 },
+        { "nd": "ND16", "opticalDensity": 1.2, "stops": 4 },
+        { "nd": "ND32", "opticalDensity": 1.5, "stops": 5 },
+        { "nd": "ND64", "opticalDensity": 1.8, "stops": 6 },
+        { "nd": "ND128", "opticalDensity": 2.1, "stops": 7 },
+        { "nd": "ND256", "opticalDensity": 2.4, "stops": 8 },
+        { "nd": "ND512", "opticalDensity": 2.7, "stops": 9 },
+        { "nd": "ND1000", "opticalDensity": 3.0, "stops": 10 },
+        { "nd": "ND2000", "opticalDensity": 3.3, "stops": 11 },
+        { "nd": "ND32000", "opticalDensity": 4.5, "stops": 15 }
+      ]
+    },
+    {
+      "id": "variable-nd",
+      "name": "Variable ND Filters",
+      "category": "nd",
+      "compensationStopsMin": 2,
+      "compensationStopsMax": 7
+    },
+    {
+      "id": "gnd",
+      "name": "Graduated ND Filters",
+      "category": "gnd",
+      "variants": [
+        { "gnd": "GND0.3", "stops": 1 },
+        { "gnd": "GND0.6", "stops": 2 },
+        { "gnd": "GND0.9", "stops": 3 },
+        { "gnd": "GND1.2", "stops": 4 }
+      ]
+    },
+    {
+      "id": "warming",
+      "name": "Warming Filters",
+      "category": "color",
+      "variants": [
+        { "filter": "81A", "stops": 0.25 },
+        { "filter": "81B", "stops": 0.3 },
+        { "filter": "81C", "stops": 0.5 }
+      ]
+    },
+    {
+      "id": "cooling",
+      "name": "Cooling Filters",
+      "category": "color",
+      "variants": [
+        { "filter": "82A", "stops": 0.2 },
+        { "filter": "82B", "stops": 0.3 },
+        { "filter": "82C", "stops": 0.5 }
+      ]
+    },
+    {
+      "id": "ir",
+      "name": "Infrared Filters",
+      "category": "infrared",
+      "variants": [
+        { "filter": "590nm", "stopsMin": 3, "stopsMax": 5 },
+        { "filter": "665nm", "stopsMin": 4, "stopsMax": 6 },
+        { "filter": "720nm", "stopsMin": 5, "stopsMax": 7 },
+        { "filter": "850nm", "stopsMin": 10, "stopsMax": 12 }
+      ]
+    },
+    {
+      "id": "diffusion",
+      "name": "Diffusion / Black Mist",
+      "category": "diffusion",
+      "variants": [
+        { "filter": "1/8", "stops": 0.1 },
+        { "filter": "1/4", "stops": 0.2 },
+        { "filter": "1/2", "stops": 0.3 },
+        { "filter": "1", "stops": 0.5 },
+        { "filter": "2", "stops": 0.5 }
+      ]
+    }
+  ]
+}

@@ -4,7 +4,7 @@ struct PhotoAssistantView: View {
     @State private var selection: Selection?
     
     enum Selection {
-        case camera, gear
+        case camera, exposure, gear
     }
     
     var body: some View {
@@ -16,6 +16,14 @@ struct PhotoAssistantView: View {
                 Spacer()
                 Button(action: { selection = .camera }) {
                     Label("Open Camera", systemImage: "camera")
+                        .font(.title2)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.accentColor.opacity(0.2))
+                        .cornerRadius(12)
+                }
+                Button(action: { selection = .exposure }) {
+                    Label("Exposure Compensation", systemImage: "camera.aperture")
                         .font(.title2)
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -35,6 +43,10 @@ struct PhotoAssistantView: View {
             .padding()
             .background(
                 NavigationLink(destination: CameraView().ignoresSafeArea(), tag: .camera, selection: $selection) { EmptyView() }
+                    .hidden()
+            )
+            .background(
+                NavigationLink(destination: ExposureCompensationView(), tag: .exposure, selection: $selection) { EmptyView() }
                     .hidden()
             )
             .background(

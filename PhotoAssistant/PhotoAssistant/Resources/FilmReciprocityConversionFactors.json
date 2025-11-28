@@ -1,0 +1,406 @@
+[
+  {
+    "id": "ilford-hp5-plus",
+    "name": "Ilford HP5 Plus",
+    "iso": 400,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.31,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "ilford-fp4-plus",
+    "name": "Ilford FP4 Plus",
+    "iso": 125,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.26,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "ilford-pan-f-plus",
+    "name": "Ilford Pan F Plus",
+    "iso": 50,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.33,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "ilford-delta-100",
+    "name": "Ilford Delta 100",
+    "iso": 100,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.26,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "ilford-delta-400",
+    "name": "Ilford Delta 400",
+    "iso": 400,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.41,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "ilford-delta-3200",
+    "name": "Ilford Delta 3200",
+    "iso": 3200,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.33,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "ilford-sfx-200",
+    "name": "Ilford SFX 200",
+    "iso": 200,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.43,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "ilford-xp2-super",
+    "name": "Ilford XP2 Super",
+    "iso": 400,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.31,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "ilford-ortho-plus",
+    "name": "Ilford Ortho Plus",
+    "iso": 80,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.25,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kentmere-100",
+    "name": "Kentmere 100",
+    "iso": 100,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.26,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kentmere-400",
+    "name": "Kentmere 400",
+    "iso": 400,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.30,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "fuji-acros-100-ii",
+    "name": "Fuji Acros 100 II",
+    "iso": 100,
+    "model": {
+      "type": "none",
+      "cutoffTime": 120.0
+    }
+  },
+  {
+    "id": "kodak-tri-x-400",
+    "name": "Kodak Tri-X 400",
+    "iso": 400,
+    "model": {
+      "type": "lookupTable",
+      "dataPoints": [
+        { "metered": 1.0, "corrected": 2.0 },
+        { "metered": 4.0, "corrected": 12.0 },
+        { "metered": 10.0, "corrected": 50.0 },
+        { "metered": 60.0, "corrected": 480.0 }
+      ],
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kodak-tmax-100",
+    "name": "Kodak T-Max 100",
+    "iso": 100,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.04,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kodak-tmax-400",
+    "name": "Kodak T-Max 400",
+    "iso": 400,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.07,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "foma-fomapan-100",
+    "name": "Fomapan 100 Classic",
+    "iso": 100,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.33,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "foma-fomapan-200",
+    "name": "Fomapan 200 Creative",
+    "iso": 200,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.30,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "foma-fomapan-400",
+    "name": "Fomapan 400 Action",
+    "iso": 400,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.42,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "rollei-retro-80s",
+    "name": "Rollei Retro 80S",
+    "iso": 80,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.33,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "rollei-rpx-25",
+    "name": "Rollei RPX 25",
+    "iso": 25,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.10,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "rollei-rpx-100",
+    "name": "Rollei RPX 100",
+    "iso": 100,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.20,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "rollei-rpx-400",
+    "name": "Rollei RPX 400",
+    "iso": 400,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.26,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kodak-portra-160",
+    "name": "Kodak Portra 160",
+    "iso": 160,
+    "model": {
+      "type": "stopCorrection",
+      "dataPoints": [
+        { "metered": 4.0, "stopAdjustment": 0.5 },
+        { "metered": 30.0, "stopAdjustment": 1.0 },
+        { "metered": 120.0, "stopAdjustment": 1.5 }
+      ],
+      "colorFilterSuggestion": "Minor color shifts; warming filter optional for very long exposures.",
+      "cutoffTime": 4.0
+    }
+  },
+  {
+    "id": "kodak-portra-400",
+    "name": "Kodak Portra 400",
+    "iso": 400,
+    "model": {
+      "type": "stopCorrection",
+      "dataPoints": [
+        { "metered": 4.0, "stopAdjustment": 0.5 },
+        { "metered": 16.0, "stopAdjustment": 1.0 },
+        { "metered": 60.0, "stopAdjustment": 1.5 }
+      ],
+      "colorFilterSuggestion": "Add a light Magenta or warming filter for very long exposures.",
+      "cutoffTime": 4.0
+    }
+  },
+  {
+    "id": "kodak-portra-800",
+    "name": "Kodak Portra 800",
+    "iso": 800,
+    "model": {
+      "type": "stopCorrection",
+      "dataPoints": [
+        { "metered": 1.0, "stopAdjustment": 0.5 },
+        { "metered": 4.0, "stopAdjustment": 1.0 },
+        { "metered": 30.0, "stopAdjustment": 2.0 }
+      ],
+      "colorFilterSuggestion": "Expect stronger color shifts at long exposures; testing recommended.",
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kodak-ektar-100",
+    "name": "Kodak Ektar 100",
+    "iso": 100,
+    "model": {
+      "type": "stopCorrection",
+      "dataPoints": [
+        { "metered": 1.0, "stopAdjustment": 0.25 },
+        { "metered": 10.0, "stopAdjustment": 0.5 },
+        { "metered": 100.0, "stopAdjustment": 1.0 }
+      ],
+      "colorFilterSuggestion": "A slight warming filter (81A) may reduce blue shift at long exposures.",
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "fujifilm-velvia-50",
+    "name": "Fujifilm Velvia 50",
+    "iso": 50,
+    "model": {
+      "type": "lookupTable",
+      "dataPoints": [
+        { "metered": 4.0, "corrected": 5.0 },
+        { "metered": 8.0, "corrected": 12.0 },
+        { "metered": 16.0, "corrected": 28.0 },
+        { "metered": 30.0, "corrected": 66.0 },
+        { "metered": 60.0, "corrected": 150.0 },
+        { "metered": 120.0, "corrected": 290.0 }
+      ],
+      "colorFilterSuggestion": "Use warming filter to counter cyan/green shift for long exposures.",
+      "cutoffTime": 4.0
+    }
+  },
+  {
+    "id": "fujifilm-velvia-100",
+    "name": "Fujifilm Velvia 100",
+    "iso": 100,
+    "model": {
+      "type": "lookupTable",
+      "dataPoints": [
+        { "metered": 1.0, "corrected": 1.0 },
+        { "metered": 4.0, "corrected": 5.0 },
+        { "metered": 8.0, "corrected": 10.0 },
+        { "metered": 16.0, "corrected": 22.0 },
+        { "metered": 30.0, "corrected": 45.0 },
+        { "metered": 60.0, "corrected": 90.0 }
+      ],
+      "colorFilterSuggestion": "Consider warming filter for very long exposures.",
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "fujifilm-provia-100f",
+    "name": "Fujifilm Provia 100F",
+    "iso": 100,
+    "model": {
+      "type": "none",
+      "cutoffTime": 120.0
+    }
+  },
+  {
+    "id": "fujifilm-astia-100f",
+    "name": "Fujifilm Astia 100F",
+    "iso": 100,
+    "model": {
+      "type": "none",
+      "cutoffTime": 60.0
+    }
+  },
+  {
+    "id": "kodak-ektachrome-e100",
+    "name": "Kodak Ektachrome E100",
+    "iso": 100,
+    "model": {
+      "type": "lookupTable",
+      "dataPoints": [
+        { "metered": 1.0, "corrected": 1.0 },
+        { "metered": 10.0, "corrected": 13.0 },
+        { "metered": 30.0, "corrected": 45.0 },
+        { "metered": 60.0, "corrected": 90.0 }
+      ],
+      "colorFilterSuggestion": "Mild color shifts; CC filtration only necessary for critical work.",
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "cinestill-50d",
+    "name": "Cinestill 50D",
+    "iso": 50,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.05,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "cinestill-800t",
+    "name": "Cinestill 800T",
+    "iso": 800,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.07,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kodak-vision3-50d",
+    "name": "Kodak Vision3 50D",
+    "iso": 50,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.05,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kodak-vision3-250d",
+    "name": "Kodak Vision3 250D",
+    "iso": 250,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.06,
+      "cutoffTime": 1.0
+    }
+  },
+  {
+    "id": "kodak-vision3-500t",
+    "name": "Kodak Vision3 500T",
+    "iso": 500,
+    "model": {
+      "type": "powerLaw",
+      "factor": 1.07,
+      "cutoffTime": 1.0
+    }
+  }
+]
