@@ -45,3 +45,4 @@ extension PhotoAssistantApp {
         // NSMotionUsageDescription: "PhotoAssistant needs motion sensor access to determine camera tilt angle for enhanced photo metadata."
     }
 }
+
