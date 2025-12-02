@@ -256,6 +256,7 @@
 				DEVELOPMENT_TEAM = 2NNJLL7727;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera so you can capture new photos and videos directly within the app saving photos taken. This media is processed locally on your device";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used only within the app to geotag and organize your photos based on where they were taken. This data is not shared externally.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo Library access is required so you can select and import existing photos and videos for editing and processing. Your media stays on your device and is not uploaded or shared.";
@@ -290,6 +291,7 @@
 				DEVELOPMENT_TEAM = 2NNJLL7727;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera so you can capture new photos and videos directly within the app saving photos taken. This media is processed locally on your device";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used only within the app to geotag and organize your photos based on where they were taken. This data is not shared externally.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo Library access is required so you can select and import existing photos and videos for editing and processing. Your media stays on your device and is not uploaded or shared.";

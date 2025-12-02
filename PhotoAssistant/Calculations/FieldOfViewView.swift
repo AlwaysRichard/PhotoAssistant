@@ -10,6 +10,10 @@ import SwiftUI
 // MARK: - Depth of Field View
 
 struct FieldOfViewView: View {
+    // MARK: - Constants
+    private let distancePicker_minFeet = 0
+    private let distancePicker_maxFeet = 50
+    
     // MARK: - Base Settings
     @State private var selectedAperture: FStop
     @State private var selectedShutterSpeed: ShutterSpeed
@@ -84,7 +88,8 @@ struct FieldOfViewView: View {
             enabled: false,
             disabledTextLabel: "-.-",
             disabledColor: Color(red: 0.643, green: 0.122, blue: 0.133)
-        )
+        ),
+        displayCameraSettings: false
     )
     
     init() {
@@ -126,12 +131,12 @@ struct FieldOfViewView: View {
         
         // If no cameras exist, create a default Full Frame camera
         if loadedCameras.isEmpty {
-            // Create default 50mm lens
+            // Create default zoom 18-300mm
             let defaultLens = Lens(
                 name: "50mm f/1.8",
-                type: .prime,
-                primeFocalLength: 50,
-                zoomRange: nil
+                type: .zoom,
+                primeFocalLength: nil,
+                zoomRange: ZoomRange(min: 18, max: 300)
             )
             
             // Create default Full Frame camera
@@ -216,14 +221,30 @@ struct FieldOfViewView: View {
             .padding(.top, 16)
             
             // MARK: - Lens Button
-            lensButtonSection
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+            LensButtonSection(
+                selectedLens: selectedLens,
+                selectedZoom: selectedZoom,
+                onZoomChange: { selectedZoom = $0 },
+                onTap: { showLensPicker = true }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
             
             // MARK: - Focus Distance Button
-            focusDistanceButtonSection
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+            FocusDistanceButtonSection(
+                focusDistanceFeet: focusDistanceFeet,
+                focusDistanceInches: focusDistanceInches,
+                isInfinity: isInfinity,
+                minFeet: distancePicker_minFeet,
+                maxFeet: distancePicker_maxFeet,
+                onDistanceChange: { newFeet in
+                    focusDistanceFeet = newFeet
+                    focusDistanceInches = 0 // Reset inches when using slider
+                },
+                onTap: { showDistancePicker = true }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
             
             Spacer()
             
@@ -272,104 +293,6 @@ struct FieldOfViewView: View {
         }
     }
     
-    // MARK: - Lens Button Section
-    
-    private var lensButtonSection: some View {
-        Button(action: { showLensPicker = true }) {
-            HStack(spacing: 12) {
-                // Lens icon
-                Image("CameraLensIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 20, height: 20)
-                    .foregroundColor(.primary)
-                
-                // "Lens" label
-                Text("Lens")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                // Zoom slider for zoom lenses (in the middle)
-                if let lens = selectedLens, lens.type == .zoom, let range = lens.zoomRange {
-                    Slider(
-                        value: Binding(
-                            get: { Double(selectedZoom) },
-                            set: { selectedZoom = Int($0) }
-                        ),
-                        in: Double(range.min)...Double(range.max),
-                        step: 1
-                    )
-                    .frame(maxWidth: .infinity)
-                    .accentColor(.blue)
-                } else {
-                    Spacer()
-                }
-                
-                // Focal length display on the right
-                if let lens = selectedLens {
-                    Text(lensDisplayText(lens))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(.separator), lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private func lensDisplayText(_ lens: Lens) -> String {
-        switch lens.type {
-        case .prime:
-            return "\(lens.primeFocalLength ?? 50)mm"
-        case .zoom:
-            return "\(selectedZoom)mm"
-        }
-    }
-    
-    // MARK: - Focus Distance Button Section
-    
-    private var focusDistanceButtonSection: some View {
-        Button(action: { showDistancePicker = true }) {
-            HStack {
-                Image(systemName: "ruler")
-                    .font(.system(size: 20))
-                    .foregroundColor(.primary)
-                
-                Text("Focus Distance:")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                Text(focusDistanceDisplay)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(.separator), lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private var focusDistanceDisplay: String {
-        if isInfinity {
-            return "∞"
-        } else {
-            return String(format: "%d'%d\"", focusDistanceFeet, focusDistanceInches)
-        }
-    }
-    
     // MARK: - Result Section
     
     private var resultSection: some View {
@@ -400,7 +323,8 @@ struct FieldOfViewView: View {
             TabView(selection: $currentResultPage) {
                 // Page 1: Calculated Results
                 VStack(spacing: 2) {
-                    ResultRow(label: "Camera Settings", value: "\(fovCalculations.focalLengthDisplay), \(fovCalculations.apertureDisplay), \(fovCalculations.focusDistanceDisplay)")
+                    ResultRow(label: "Camera Settings", value: "\(fovCalculations.focalLengthDisplay), \(fovCalculations.focusDistanceDisplay)")
+                    ResultRow(label: "Format Size", value: "\(selectedCamera?.capturePlaneHeight ?? 0) X \(selectedCamera?.capturePlaneWidth ?? 0) mm")
                     
                     ResultRow(label: "Horizontal Angle", value: fovCalculations.horizontalAngleDisplay)
                     ResultRow(label: "Vertical Angle", value: fovCalculations.verticalAngleDisplay)
@@ -624,7 +548,7 @@ struct FieldOfViewView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Picker("Feet", selection: $focusDistanceFeet) {
-                            ForEach(0..<50) { feet in
+                            ForEach(distancePicker_minFeet...distancePicker_maxFeet, id: \.self) { feet in
                                 Text("\(feet)'").tag(feet)
                             }
                         }
@@ -653,7 +577,7 @@ struct FieldOfViewView: View {
                     HStack {
                         Image(systemName: "infinity")
                             .font(.title2)
-                        Text("Infinity (≥50')")
+                        Text("Infinity (≥\(distancePicker_maxFeet)')")
                             .font(.headline)
                     }
                 }
@@ -661,7 +585,7 @@ struct FieldOfViewView: View {
                 .onChange(of: isInfinity) { oldValue, newValue in
                     if newValue {
                         // Set to infinity equivalent
-                        focusDistanceFeet = 50
+                        focusDistanceFeet = distancePicker_maxFeet
                         focusDistanceInches = 0
                     }
                 }

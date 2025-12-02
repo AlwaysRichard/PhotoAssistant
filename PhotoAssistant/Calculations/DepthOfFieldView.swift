@@ -10,6 +10,10 @@ import SwiftUI
 // MARK: - Depth of Field View
 
 struct DepthOfFieldView: View {
+    // MARK: - Constants
+    private let distancePicker_minFeet = 0
+    private let distancePicker_maxFeet = 50
+    
     // MARK: - Base Settings
     @State private var selectedAperture: FStop
     @State private var selectedShutterSpeed: ShutterSpeed
@@ -26,6 +30,10 @@ struct DepthOfFieldView: View {
     // MARK: - Sheet Presentation
     @State private var showLensPicker = false
     @State private var showDistancePicker = false
+    @State private var showAperturePicker = false
+    
+    // MARK: - Results Page State
+    @State private var currentResultPage = 0
     
     // MARK: - EV Compensation (not used for DoF but required by CameraDisplayView)
     @State private var evCompensation: Double = 0.0
@@ -81,7 +89,8 @@ struct DepthOfFieldView: View {
             enabled: false,
             disabledTextLabel: "-.-",
             disabledColor: Color(red: 0.643, green: 0.122, blue: 0.133)
-        )
+        ),
+        displayCameraSettings: false
     )
     
     init() {
@@ -123,12 +132,12 @@ struct DepthOfFieldView: View {
         
         // If no cameras exist, create a default Full Frame camera
         if loadedCameras.isEmpty {
-            // Create default 50mm lens
+            // Create default zoom 18-300mm
             let defaultLens = Lens(
                 name: "50mm f/1.8",
-                type: .prime,
-                primeFocalLength: 50,
-                zoomRange: nil
+                type: .zoom,
+                primeFocalLength: nil,
+                zoomRange: ZoomRange(min: 18, max: 300)
             )
             
             // Create default Full Frame camera
@@ -212,15 +221,43 @@ struct DepthOfFieldView: View {
             .padding(.horizontal, 16)
             .padding(.top, 16)
             
+            // MARK: - Aperture Button
+            FStopButtonSection(
+                selectedAperture: selectedAperture,
+                fStops: fStops,
+                onApertureChange: { newAperture in
+                    selectedAperture = newAperture
+                },
+                onTap: { showAperturePicker = true }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            
             // MARK: - Lens Button
-            lensButtonSection
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+            LensButtonSection(
+                selectedLens: selectedLens,
+                selectedZoom: selectedZoom,
+                onZoomChange: { selectedZoom = $0 },
+                onTap: { showLensPicker = true }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
             
             // MARK: - Focus Distance Button
-            focusDistanceButtonSection
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+            FocusDistanceButtonSection(
+                focusDistanceFeet: focusDistanceFeet,
+                focusDistanceInches: focusDistanceInches,
+                isInfinity: isInfinity,
+                minFeet: distancePicker_minFeet,
+                maxFeet: distancePicker_maxFeet,
+                onDistanceChange: { newFeet in
+                    focusDistanceFeet = newFeet
+                    focusDistanceInches = 0 // Reset inches when using slider
+                },
+                onTap: { showDistancePicker = true }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
             
             Spacer()
             
@@ -267,103 +304,8 @@ struct DepthOfFieldView: View {
         .sheet(isPresented: $showDistancePicker) {
             distancePickerSheet
         }
-    }
-    
-    // MARK: - Lens Button Section
-    
-    private var lensButtonSection: some View {
-        Button(action: { showLensPicker = true }) {
-            HStack(spacing: 12) {
-                // Lens icon
-                Image("CameraLensIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 20, height: 20)
-                    .foregroundColor(.primary)
-                
-                // "Lens" label
-                Text("Lens")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                // Zoom slider for zoom lenses (in the middle)
-                if let lens = selectedLens, lens.type == .zoom, let range = lens.zoomRange {
-                    Slider(
-                        value: Binding(
-                            get: { Double(selectedZoom) },
-                            set: { selectedZoom = Int($0) }
-                        ),
-                        in: Double(range.min)...Double(range.max),
-                        step: 1
-                    )
-                    .frame(maxWidth: .infinity)
-                    .accentColor(.blue)
-                } else {
-                    Spacer()
-                }
-                
-                // Focal length display on the right
-                if let lens = selectedLens {
-                    Text(lensDisplayText(lens))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(.separator), lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private func lensDisplayText(_ lens: Lens) -> String {
-        switch lens.type {
-        case .prime:
-            return "\(lens.primeFocalLength ?? 50)mm"
-        case .zoom:
-            return "\(selectedZoom)mm"
-        }
-    }
-    
-    // MARK: - Focus Distance Button Section
-    
-    private var focusDistanceButtonSection: some View {
-        Button(action: { showDistancePicker = true }) {
-            HStack {
-                Image(systemName: "ruler")
-                    .font(.system(size: 20))
-                    .foregroundColor(.primary)
-                
-                Text("Focus Distance:")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                Text(focusDistanceDisplay)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(.separator), lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private var focusDistanceDisplay: String {
-        if isInfinity {
-            return "∞"
-        } else {
-            return String(format: "%d'%d\"", focusDistanceFeet, focusDistanceInches)
+        .sheet(isPresented: $showAperturePicker) {
+            aperturePickerSheet
         }
     }
     
@@ -393,27 +335,195 @@ struct DepthOfFieldView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
             
-            // Results
-            Group {
-                ResultRow(label: "Camera Settings", value: "\(dofCalculations.focalLengthDisplay), \(dofCalculations.apertureDisplay), \(dofCalculations.focusDistanceDisplay)")
-                //ResultRow(label: "Focal Length (f)", value: dofCalculations.focalLengthDisplay)
-                //ResultRow(label: "Aperture (N)", value: dofCalculations.apertureDisplay)
-                //ResultRow(label: "Focus Distance (u)", value: dofCalculations.focusDistanceDisplay)
-                ResultRow(label: "CoC (c)", value: dofCalculations.cocDisplay)
-                ResultRow(label: "Hyperfocal Distance (H)", value: dofCalculations.hyperfocalDisplay)
-                ResultRow(label: "DoF Near Limit (D₁)", value: dofCalculations.nearLimitDisplay)
-                ResultRow(label: "DoF Far Limit (D₂)", value: dofCalculations.farLimitDisplay)
-                ResultRow(label: "Total Depth of Field", value: dofCalculations.totalDoFDisplay)
+            // Paged Content
+            TabView(selection: $currentResultPage) {
+                // Page 1: Calculated Results
+                VStack(spacing: 2) {
+                    ResultRow(label: "Camera Settings", value: "\(dofCalculations.focalLengthDisplay), \(dofCalculations.apertureDisplay), \(dofCalculations.focusDistanceDisplay)")
+                    ResultRow(label: "Format Size", value: "\(selectedCamera?.capturePlaneHeight ?? 0) X \(selectedCamera?.capturePlaneWidth ?? 0) mm")
+                    ResultRow(label: "CoC (c)", value: dofCalculations.cocDisplay)
+                    ResultRow(label: "Hyperfocal Distance (H)", value: dofCalculations.hyperfocalDisplay)
+                    ResultRow(label: "DoF Near Limit (D₁)", value: dofCalculations.nearLimitDisplay)
+                    ResultRow(label: "DoF Far Limit (D₂)", value: dofCalculations.farLimitDisplay)
+                    ResultRow(label: "Total Depth of Field", value: dofCalculations.totalDoFDisplay)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .tag(0)
+                
+                // Page 2: Visual Representation
+                VStack(alignment: .center, spacing: 0) {
+                    Text("Depth of Field Visualization")
+                        .font(.custom("American Typewriter", size: 14))
+                        .foregroundColor(.white)
+                        .padding(.top, 0)
+                    
+                    Spacer()
+                    
+                    GeometryReader { geometry in
+                        dofVisualization(in: geometry)
+                    }
+                    .frame(height: 140)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .tag(1)
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 4)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 200) // Force results height!!!!!
+            
+            // Page Indicator Dots
+            HStack(spacing: 8) {
+                ForEach(0..<2, id: \.self) { index in
+                    Circle()
+                        .fill(currentResultPage == index ? Color.white : Color.white.opacity(0.4))
+                        .frame(width: 8, height: 8)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 8)
             
             Spacer()
-                .frame(height: 12)
+                .frame(height: 8)
         }
         .background(Color(white: 0.25))
         .cornerRadius(8)
         .padding()
+    }
+    
+    // MARK: - DoF Visualization
+    
+    private func dofVisualization(in geometry: GeometryProxy) -> some View {
+        let availableWidth = geometry.size.width - 60 // Balanced padding (30 on each side)
+        
+        // Fixed scale: Camera at 0, 50 feet at the end (typical lens distance scale max)
+        // 50 feet = 600 inches = 15240 mm
+        let scaleStart: Double = 0
+        let scaleEnd: Double = 15240.0 // 50 feet in millimeters
+        let scaleRange = scaleEnd - scaleStart
+        
+        // Get actual DoF values
+        let nearLimit = dofCalculations.nearLimit
+        let focusDistance = dofCalculations.focusDistance
+        let farLimit = dofCalculations.farLimit
+        
+        // Cap far limit at 50 feet for display position (but keep actual value for label)
+        // When D2 exceeds 50', it stays pegged at the end of the scale
+        let farLimitForDisplay = farLimit.isInfinite ? scaleEnd : min(farLimit, scaleEnd)
+        
+        // Calculate positions along the fixed scale
+        func xPosition(for distance: Double) -> CGFloat {
+            // Clamp distance to scale range
+            let clampedDistance = max(scaleStart, min(distance, scaleEnd))
+            let normalized = (clampedDistance - scaleStart) / scaleRange
+            return CGFloat(normalized) * availableWidth
+        }
+        
+        let nearX = xPosition(for: nearLimit)
+        let focusX = xPosition(for: focusDistance)
+        let farX = xPosition(for: farLimitForDisplay)
+        
+        return VStack(spacing: 8) {
+            // Top row: Camera, subject markers, and distances
+            ZStack(alignment: .leading) {
+                // Camera icon on the left
+                HStack {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.white)
+                        .frame(width: 30)
+                    Spacer()
+                }
+                
+                // Timeline with markers
+                HStack(spacing: 0) {
+                    Spacer()
+                        .frame(width: 30)
+                    
+                    ZStack(alignment: .leading) {
+                        // Main timeline (represents the lens distance scale)
+                        Rectangle()
+                            .fill(Color.white)
+                            .frame(width: availableWidth, height: 2)
+                        
+                        // Near limit marker
+                        Rectangle()
+                            .fill(Color.white)
+                            .frame(width: 2, height: 20)
+                            .offset(x: nearX)
+                        
+                        // Focus distance marker (subject)
+                        VStack(spacing: 0) {
+                            Image(systemName: "figure.stand")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white)
+                            Rectangle()
+                                .fill(Color.white)
+                                .frame(width: 2, height: 10)
+                        }
+                        .offset(x: focusX - 10)
+                        
+                        // Far limit marker
+                        Rectangle()
+                            .fill(Color.white)
+                            .frame(width: 2, height: 20)
+                            .offset(x: farX)
+                    }
+                    
+                    Spacer()
+                        .frame(width: 30)
+                }
+            }
+            .frame(height: 40)
+            
+            // Distance labels row - always centered combined format
+            HStack(spacing: 0) {
+                Spacer()
+                    .frame(width: 30)
+                
+                Text("\(dofCalculations.nearLimitDisplay) - \(dofCalculations.focusDistanceDisplay) - \(farLimit.isInfinite ? "∞" : dofCalculations.farLimitDisplay)")
+                    .font(.custom("American Typewriter", size: 10))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .frame(width: availableWidth)
+                    .multilineTextAlignment(.center)
+                
+                Spacer()
+                    .frame(width: 30)
+            }
+            
+            // DoF range indicator
+            HStack(spacing: 0) {
+                Spacer()
+                    .frame(width: 30)
+                
+                ZStack(alignment: .leading) {
+                    // DoF range bar
+                    Rectangle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: farX - nearX, height: 8)
+                        .offset(x: nearX)
+                    
+                    // Label underneath
+                    VStack(spacing: 2) {
+                        Spacer()
+                            .frame(height: 12)
+                        Text(dofCalculations.totalDoFDisplay)
+                            .font(.custom("American Typewriter", size: 12))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                    }
+                    .frame(width: availableWidth)
+                }
+                .frame(width: availableWidth)
+                
+                Spacer()
+                    .frame(width: 30)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Lens Picker Sheet
@@ -514,7 +624,7 @@ struct DepthOfFieldView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Picker("Feet", selection: $focusDistanceFeet) {
-                            ForEach(0..<50) { feet in
+                            ForEach(distancePicker_minFeet...distancePicker_maxFeet, id: \.self) { feet in
                                 Text("\(feet)'").tag(feet)
                             }
                         }
@@ -543,7 +653,7 @@ struct DepthOfFieldView: View {
                     HStack {
                         Image(systemName: "infinity")
                             .font(.title2)
-                        Text("Infinity (≥50')")
+                        Text("Infinity (≥\(distancePicker_maxFeet)')")
                             .font(.headline)
                     }
                 }
@@ -551,7 +661,7 @@ struct DepthOfFieldView: View {
                 .onChange(of: isInfinity) { oldValue, newValue in
                     if newValue {
                         // Set to infinity equivalent
-                        focusDistanceFeet = 50
+                        focusDistanceFeet = distancePicker_maxFeet
                         focusDistanceInches = 0
                     }
                 }
@@ -575,6 +685,39 @@ struct DepthOfFieldView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+    
+    // MARK: - Aperture Picker Sheet
+    
+    private var aperturePickerSheet: some View {
+        NavigationView {
+            List {
+                ForEach(fStops) { fStop in
+                    Button(action: {
+                        selectedAperture = fStop
+                        showAperturePicker = false
+                    }) {
+                        HStack {
+                            Text(fStop.label)
+                            Spacer()
+                            if selectedAperture.value == fStop.value {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Aperture")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        showAperturePicker = false
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - DoF Calculations
