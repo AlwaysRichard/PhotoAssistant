@@ -73,7 +73,8 @@ struct ExposureCompensationView: View {
             enabled: true,
             disabledTextLabel: "-.-",
             disabledColor: Color(red: 0.643, green: 0.122, blue: 0.133)
-        )
+        ),
+        displayCameraSettings: true
     )
 
     init() {
@@ -153,9 +154,12 @@ struct ExposureCompensationView: View {
             .padding(.top, 16)
 
             // Filter button
-            filterButtonSection
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+            FilterButtonSection(
+                totalFilterStops: totalFilterStops,
+                onTap: { showFiltersView = true }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
 
             Spacer()
 
@@ -186,38 +190,6 @@ struct ExposureCompensationView: View {
         }
         .navigationTitle("Exposure Compensation")
         .navigationBarTitleDisplayMode(.inline)
-    }
-
-    // MARK: - Filter Button Section (KEPT)
-
-    private var filterButtonSection: some View {
-        Button(action: { showFiltersView = true }) {
-            HStack {
-                Image(systemName: "camera.filters")
-                    .font(.system(size: 20))
-                    .foregroundColor(.primary)
-
-                Text("Filters")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-
-                Spacer()
-
-                if totalFilterStops > 0 {
-                    Text(String(format: "Stops +%.1f", totalFilterStops))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(.separator), lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
     }
 
     private var totalFilterStops: Double {

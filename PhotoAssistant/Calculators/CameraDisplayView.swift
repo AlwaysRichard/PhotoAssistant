@@ -30,6 +30,7 @@ struct CameraDisplayControlState {
     let ISOPicker: PickerControl
     let EVPicker: PickerControl
     let EVValuePicker: PickerControl
+    let displayCameraSettings: Bool
     // Add other controls here (e.g., filmPicker, cameraPicker) as needed
     
     // Static helper for a fully enabled state, useful for default initializers
@@ -39,7 +40,8 @@ struct CameraDisplayControlState {
             shutterPicker: PickerControl(enabled: true, disabledTextLabel: "--", disabledColor: Color(.systemGray)),
             ISOPicker: PickerControl(enabled: true, disabledTextLabel: "---", disabledColor: Color(.systemGray)),
             EVPicker: PickerControl(enabled: true, disabledTextLabel: "0.0", disabledColor: Color(.systemGray)),
-            EVValuePicker: PickerControl(enabled: true, disabledTextLabel: "-.-", disabledColor: Color(.systemGray))
+            EVValuePicker: PickerControl(enabled: true, disabledTextLabel: "-.-", disabledColor: Color(.systemGray)),
+            displayCameraSettings: true
         )
     }
 }
@@ -137,69 +139,78 @@ struct CameraDisplayView: View {
             .padding(.top, 16)
             .padding(.bottom, 8)
 
-            // Horizontal line
-            Rectangle()
-                .fill(.black)
-                .frame(height: 1)
-                .padding(.horizontal, 20)
+            if controlState.displayCameraSettings == true {
+                // Horizontal line
+                Rectangle()
+                    .fill(.black)
+                    .frame(height: 1)
+                    .padding(.horizontal, 20)
 
-            // F-Stop and Shutter Speed
-            HStack(alignment: .center, spacing: 20) {
-                apertureControl
-                Spacer()
-                shutterSpeedControl
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 0)
-
-            HStack {
-                Spacer()
-                isoControl
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 0)
-            .padding(.bottom, 0)
-
-            // EV and compensation
-            HStack {
-                if controlState.EVValuePicker.enabled {
-                    Text(String(format: "EV %.1f", exposureValue))
-                        .font(.custom("American Typewriter", size: 18))
-                        .fontWeight(.semibold)
-                        .foregroundColor(.black)
-                } else {
-                    Text("EV \(controlState.EVValuePicker.disabledTextLabel)")
-                        .font(.custom("American Typewriter", size: 18))
-                        .fontWeight(.semibold)
-                        .foregroundColor(controlState.EVValuePicker.disabledColor)
+                // F-Stop and Shutter Speed
+                HStack(alignment: .center, spacing: 20) {
+                    apertureControl
+                    Spacer()
+                    shutterSpeedControl
                 }
-
-
-                Spacer()
-
-                evCompensationControl
-                /*
-                Button(action: { showEVPicker = true }) {
-                    HStack(spacing: 4) {
-                        evCompensationControl
-                        PlusMinusDiagonalIcon(size: 18, backgroundColor: .black, textColor: .white)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 0)
+                
+                HStack {
+                    Spacer()
+                    isoControl
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 0)
+                .padding(.bottom, 0)
+                
+                // EV and compensation
+                HStack {
+                    if controlState.EVValuePicker.enabled {
+                        Text(String(format: "EV %.1f", exposureValue))
+                            .font(.custom("American Typewriter", size: 18))
+                            .fontWeight(.semibold)
+                            .foregroundColor(.black)
+                    } else {
+                        Text("EV \(controlState.EVValuePicker.disabledTextLabel)")
+                            .font(.custom("American Typewriter", size: 18))
+                            .fontWeight(.semibold)
+                            .foregroundColor(controlState.EVValuePicker.disabledColor)
                     }
+                    
+                    
+                    Spacer()
+                    
+                    evCompensationControl
+                    /*
+                     Button(action: { showEVPicker = true }) {
+                     HStack(spacing: 4) {
+                     evCompensationControl
+                     PlusMinusDiagonalIcon(size: 18, backgroundColor: .black, textColor: .white)
+                     }
+                     }
+                     */
+                        .buttonStyle(PlainButtonStyle())
                 }
-                */
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(.top, 10)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
-
-            // Bottom horizontal line
-            Rectangle()
-                .fill(.black)
-                .frame(height: 1)
+                .padding(.top, 10)
                 .padding(.horizontal, 20)
-                .padding(.bottom, 8)
-
+                .padding(.bottom, 16)
+                
+                // Bottom horizontal line
+                Rectangle()
+                    .fill(.black)
+                    .frame(height: 1)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+            } else {
+                // Horizontal line
+                Rectangle()
+                    .fill(.black)
+                    .frame(height: 1)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+            }
+            
             // Instructional text
             Text("Tap any setting to adjust")
                 .font(.system(size: 12))

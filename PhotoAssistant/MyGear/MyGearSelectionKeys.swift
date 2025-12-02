@@ -1,4 +1,3 @@
-//
 //  MyGearSelectionKeys.swift
 //  PhotoAssistant
 //
