@@ -34,6 +34,7 @@ struct CameraView: View {
     @State private var showCropMarks = false
     @State private var selectedFocalLength = 80
     @State private var showCropMarksControlPanel = false
+    @State private var selectedZoomLens: ZoomLens? = nil // Track selected zoom lens
 
     // NEW STATE: For managing loaded gear and the selected camera
     @State private var gearList: [MyGearModel] = MyGearModel.loadGearList()
@@ -98,7 +99,8 @@ struct CameraView: View {
                     selectedFocalLength: selectedFocalLength,
                     currentCameraFocalLength: effectiveFocalLength,
                     isVisible: showCropMarks,
-                    isZoomLens: isZoomLensActive
+                    isZoomLens: isZoomLensActive,
+                    zoomRange: selectedZoomLens.map { (min: $0.minFocal, max: $0.maxFocal) }
                 )
                 .allowsHitTesting(false)
 
@@ -113,7 +115,8 @@ struct CameraView: View {
                                 selectedGear: $selectedGear,
                                 selectedFocalLength: $selectedFocalLength,
                                 currentCameraFocalLength: effectiveFocalLength,
-                                showCropMarks: $showCropMarks
+                                showCropMarks: $showCropMarks,
+                                selectedZoomLens: $selectedZoomLens
                             )
                             // MODIFIED: Increased padding to place it reliably below the navigation bar
                             .padding(.top, 125)
@@ -1221,6 +1224,11 @@ struct ZoomLens: Identifiable, Equatable {
     var name: String
     var minFocal: Int
     var maxFocal: Int
+    
+    // Custom Equatable implementation to compare by focal lengths and name, not by UUID
+    static func == (lhs: ZoomLens, rhs: ZoomLens) -> Bool {
+        lhs.name == rhs.name && lhs.minFocal == rhs.minFocal && lhs.maxFocal == rhs.maxFocal
+    }
 }
 
 struct CropMarksOverlay: View {
@@ -1234,8 +1242,8 @@ struct CropMarksOverlay: View {
     let currentCameraFocalLength: Int
     let isVisible: Bool
     let isZoomLens: Bool
-    // MODIFIED: Use a property to hold the default range for visualization
-    let defaultZoomRange: (min: Int, max: Int) = (35, 75)
+    // MODIFIED: Accept actual zoom range from selected lens
+    let zoomRange: (min: Int, max: Int)?
     
     var body: some View {
         if isVisible {
@@ -1319,37 +1327,42 @@ struct CropMarksOverlay: View {
     }
     
     private func zoomRangeVisualization(geometry: GeometryProxy) -> some View {
+        // Use actual zoom range if available, otherwise return empty view
+        guard let range = zoomRange else {
+            return AnyView(EmptyView())
+        }
+        
         let minCropFrame = calculateCropFrame(
             capturePlane: capturePlane,
-            for: defaultZoomRange.min, // MODIFIED: Use defaultZoomRange
+            for: range.min, // Use actual min zoom
             cameraFocalLength: currentCameraFocalLength,
-            capturePlaneWidth: capturePlaneWidth, // NEW
-            capturePlaneHeight: capturePlaneHeight, // NEW
-            capturePlaneDiagonal: capturePlaneDiagonal, // NEW
+            capturePlaneWidth: capturePlaneWidth,
+            capturePlaneHeight: capturePlaneHeight,
+            capturePlaneDiagonal: capturePlaneDiagonal,
             in: geometry.size
         )
         
         let maxCropFrame = calculateCropFrame(
             capturePlane: capturePlane,
-            for: defaultZoomRange.max, // MODIFIED: Use defaultZoomRange
+            for: range.max, // Use actual max zoom
             cameraFocalLength: currentCameraFocalLength,
-            capturePlaneWidth: capturePlaneWidth, // NEW
-            capturePlaneHeight: capturePlaneHeight, // NEW
-            capturePlaneDiagonal: capturePlaneDiagonal, // NEW
+            capturePlaneWidth: capturePlaneWidth,
+            capturePlaneHeight: capturePlaneHeight,
+            capturePlaneDiagonal: capturePlaneDiagonal,
             in: geometry.size
         )
         
         let centerX = geometry.size.width / 2
         let centerY = geometry.size.height / 2
         
-        return ZStack {
-            // Outer frame (wide end - 35mm)
+        return AnyView(ZStack {
+            // Outer frame (wide end - minimum zoom)
             Rectangle()
                 .stroke(Color.green.opacity(0.6), lineWidth: 1)
                 .frame(width: minCropFrame.width, height: minCropFrame.height)
                 .position(x: centerX, y: centerY)
             
-            // Inner frame (tele end - 75mm)
+            // Inner frame (tele end - maximum zoom)
             Rectangle()
                 .stroke(Color.blue.opacity(0.6), lineWidth: 1)
                 .frame(width: maxCropFrame.width, height: maxCropFrame.height)
@@ -1357,13 +1370,13 @@ struct CropMarksOverlay: View {
             
             // Corner dots for extreme focal lengths
             Group {
-                // Wide end corners (35mm)
+                // Wide end corners (minimum zoom)
                 cornerDot(at: .topLeading, frameSize: minCropFrame, geometry: geometry, color: .green)
                 cornerDot(at: .topTrailing, frameSize: minCropFrame, geometry: geometry, color: .green)
                 cornerDot(at: .bottomLeading, frameSize: minCropFrame, geometry: geometry, color: .green)
                 cornerDot(at: .bottomTrailing, frameSize: minCropFrame, geometry: geometry, color: .green)
                 
-                // Tele end corners (75mm)
+                // Tele end corners (maximum zoom)
                 cornerDot(at: .topLeading, frameSize: maxCropFrame, geometry: geometry, color: .blue)
                 cornerDot(at: .topTrailing, frameSize: maxCropFrame, geometry: geometry, color: .blue)
                 cornerDot(at: .bottomLeading, frameSize: maxCropFrame, geometry: geometry, color: .blue)
@@ -1373,7 +1386,7 @@ struct CropMarksOverlay: View {
             // Focal length labels for extremes
             VStack {
                 HStack {
-                    Text("\(defaultZoomRange.min)mm") // MODIFIED: Use defaultZoomRange
+                    Text("\(range.min)mm") // Use actual min zoom
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.green)
                         .padding(4)
@@ -1383,7 +1396,7 @@ struct CropMarksOverlay: View {
                     
                     Spacer()
                     
-                    Text("\(defaultZoomRange.max)mm") // MODIFIED: Use defaultZoomRange
+                    Text("\(range.max)mm") // Use actual max zoom
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.blue)
                         .padding(4)
@@ -1394,7 +1407,7 @@ struct CropMarksOverlay: View {
                 
                 Spacer()
             }
-        }
+        })
     }
     
     private func cornerDot(at corner: CornerPosition, frameSize: (width: CGFloat, height: CGFloat, isVisible: Bool), geometry: GeometryProxy, color: Color) -> some View {
@@ -1746,6 +1759,9 @@ struct CropMarksControlPanel: View {
     let currentCameraFocalLength: Int
     @Binding var showCropMarks: Bool
     
+    // MODIFIED: Accept selectedZoomLens as a Binding so parent can access it
+    @Binding var selectedZoomLens: ZoomLens?
+    
     // MODIFIED: Compute available lenses from selected gear instead of hardcoding
     private var availableFixedLenses: [Int] {
         guard let gear = selectedGear else { return [] }
@@ -1769,9 +1785,6 @@ struct CropMarksControlPanel: View {
             }
             .sorted(by: { $0.minFocal < $1.minFocal })
     }
-    
-    // MODIFIED: Tracks the currently selected zoom lens object, if any
-    @State private var selectedLens: ZoomLens? = nil
 
     // MARK: - Extracted Sub-Views for Compiler Stability
 
@@ -1811,7 +1824,7 @@ struct CropMarksControlPanel: View {
                         }
                     }
                     // Reset zoom lens selection
-                    selectedLens = nil
+                    selectedZoomLens = nil
                     // Keep crop marks visible if they were visible
                     if showCropMarks {
                         withAnimation { showCropMarks = true }
@@ -1864,7 +1877,7 @@ struct CropMarksControlPanel: View {
     
     @ViewBuilder
     private func fixedLensButton(focalLength: Int) -> some View {
-        let isSelected = (selectedLens == nil && selectedFocalLength == focalLength && showCropMarks)
+        let isSelected = (selectedZoomLens == nil && selectedFocalLength == focalLength && showCropMarks)
         
         Button(action: {
             if isSelected {
@@ -1873,7 +1886,7 @@ struct CropMarksControlPanel: View {
             } else {
                 // Tapping a new fixed lens: Turn ON marks
                 selectedFocalLength = focalLength
-                selectedLens = nil // Ensure no zoom lens is active
+                selectedZoomLens = nil // Ensure no zoom lens is active
                 withAnimation { showCropMarks = true }
             }
         }) {
@@ -1896,18 +1909,18 @@ struct CropMarksControlPanel: View {
     
     @ViewBuilder
     private func zoomLensButton(zoom: ZoomLens) -> some View {
-        let isSelected = (selectedLens == zoom && showCropMarks)
+        let isSelected = (selectedZoomLens == zoom && showCropMarks)
         
         Button(action: {
             if isSelected {
                 // Tapping the currently selected zoom lens: Turn OFF marks
                 withAnimation {
                     showCropMarks = false
-                    selectedLens = nil
+                    selectedZoomLens = nil
                 }
             } else {
                 // Tapping to select zoom lens: Turn ON marks
-                selectedLens = zoom
+                selectedZoomLens = zoom
                 // Set to middle of zoom range
                 selectedFocalLength = Int(round(Double(zoom.minFocal + zoom.maxFocal) / 2.0))
                 withAnimation { showCropMarks = true }
@@ -1933,7 +1946,7 @@ struct CropMarksControlPanel: View {
     @ViewBuilder
     private var zoomSliderView: some View {
         // Zoom slider (only show when a zoom lens is selected)
-        if let activeZoomLens = selectedLens {
+        if let activeZoomLens = selectedZoomLens {
             VStack(spacing: 4) {
                 HStack {
                     Text("\(activeZoomLens.minFocal)mm")
@@ -1949,6 +1962,20 @@ struct CropMarksControlPanel: View {
                         .foregroundColor(.white.opacity(0.7))
                 }
                 
+                // Calculate appropriate step size based on zoom range
+                let zoomRange = activeZoomLens.maxFocal - activeZoomLens.minFocal
+                let stepSize: Double = {
+                    if zoomRange <= 20 {
+                        return 1.0  // 1mm steps for short zooms (e.g., 14-24mm)
+                    } else if zoomRange <= 50 {
+                        return 2.0  // 2mm steps for medium zooms
+                    } else if zoomRange <= 100 {
+                        return 5.0  // 5mm steps for longer zooms
+                    } else {
+                        return 10.0 // 10mm steps for very long zooms
+                    }
+                }()
+                
                 Slider(
                     value: Binding(
                         get: { Double(selectedFocalLength) },
@@ -1961,7 +1988,7 @@ struct CropMarksControlPanel: View {
                         }
                     ),
                     in: Double(activeZoomLens.minFocal)...Double(activeZoomLens.maxFocal),
-                    step: 5
+                    step: stepSize
                 )
                 .accentColor(.white)
                 .onTapGesture {
@@ -2031,7 +2058,7 @@ struct CropMarksControlPanel: View {
             if let initialZoomLens = availableZoomLenses.first(where: {
                 selectedFocalLength >= $0.minFocal && selectedFocalLength <= $0.maxFocal
             }) {
-                selectedLens = initialZoomLens
+                selectedZoomLens = initialZoomLens
             }
         }
     }
@@ -2050,4 +2077,3 @@ struct CropMarksControlPanel: View {
         return fovRadians * 180 / .pi // Convert to degrees
     }
 }
-
