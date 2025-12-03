@@ -365,6 +365,11 @@ struct DepthOfFieldView: View {
                         dofVisualization(in: geometry)
                     }
                     .frame(height: 140)
+                    .padding(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    )
                     
                     Spacer()
                 }
@@ -396,7 +401,7 @@ struct DepthOfFieldView: View {
     // MARK: - DoF Visualization
     
     private func dofVisualization(in geometry: GeometryProxy) -> some View {
-        let availableWidth = geometry.size.width - 60 // Balanced padding (30 on each side)
+        let availableWidth = geometry.size.width - 50 // Account for internal spacing only
         
         // Fixed scale: Camera at 0, 50 feet at the end (typical lens distance scale max)
         // 50 feet = 600 inches = 15240 mm
@@ -426,6 +431,8 @@ struct DepthOfFieldView: View {
         let farX = xPosition(for: farLimitForDisplay)
         
         return VStack(spacing: 8) {
+            Spacer()
+            
             // Top row: Camera, subject markers, and distances
             ZStack(alignment: .leading) {
                 // Camera icon on the left
@@ -433,14 +440,14 @@ struct DepthOfFieldView: View {
                     Image(systemName: "video.fill")
                         .font(.system(size: 24))
                         .foregroundColor(.white)
-                        .frame(width: 30)
+                        .frame(width: 40)
                     Spacer()
                 }
                 
                 // Timeline with markers
                 HStack(spacing: 0) {
                     Spacer()
-                        .frame(width: 30)
+                        .frame(width: 40)
                     
                     ZStack(alignment: .leading) {
                         // Main timeline (represents the lens distance scale)
@@ -473,7 +480,7 @@ struct DepthOfFieldView: View {
                     }
                     
                     Spacer()
-                        .frame(width: 30)
+                        .frame(width: 40)
                 }
             }
             .frame(height: 40)
@@ -481,49 +488,53 @@ struct DepthOfFieldView: View {
             // Distance labels row - always centered combined format
             HStack(spacing: 0) {
                 Spacer()
-                    .frame(width: 30)
+                    .frame(width: 40)
                 
                 Text("\(dofCalculations.nearLimitDisplay) - \(dofCalculations.focusDistanceDisplay) - \(farLimit.isInfinite ? "∞" : dofCalculations.farLimitDisplay)")
-                    .font(.custom("American Typewriter", size: 10))
+                    .font(.custom("American Typewriter", size: 16))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .frame(width: availableWidth)
                     .multilineTextAlignment(.center)
                 
                 Spacer()
-                    .frame(width: 30)
+                    .frame(width: 40)
             }
             
             // DoF range indicator
             HStack(spacing: 0) {
                 Spacer()
-                    .frame(width: 30)
+                    .frame(width: 40)
                 
-                ZStack(alignment: .leading) {
-                    // DoF range bar
-                    Rectangle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: farX - nearX, height: 8)
-                        .offset(x: nearX)
-                    
-                    // Label underneath
-                    VStack(spacing: 2) {
-                        Spacer()
-                            .frame(height: 12)
-                        Text(dofCalculations.totalDoFDisplay)
-                            .font(.custom("American Typewriter", size: 12))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
+                VStack(spacing: 4) {
+                    // DoF range bar - centered in available width
+                    ZStack {
+                        // Position the bar based on timeline positions
+                        HStack(spacing: 0) {
+                            Spacer()
+                                .frame(width: nearX)
+                            Rectangle()
+                                .fill(Color.yellow.opacity(0.3))
+                                .frame(width: farX - nearX, height: 8)
+                            Spacer()
+                        }
                     }
                     .frame(width: availableWidth)
+                    
+                    // Label underneath - centered
+                    Text(dofCalculations.totalDoFDisplay)
+                        .font(.custom("American Typewriter", size: 16))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
                 }
                 .frame(width: availableWidth)
                 
                 Spacer()
-                    .frame(width: 30)
+                    .frame(width: 40)
             }
+            
+            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Lens Picker Sheet
